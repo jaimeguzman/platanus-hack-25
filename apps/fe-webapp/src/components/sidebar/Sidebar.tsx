@@ -82,7 +82,7 @@ export function AppSidebar() {
         .order('name');
       
       if (data) {
-        const loadedPillars: Pillar[] = data
+        const loadedPillars: Pillar[] = (data as Array<{ name: string }>)
           .map((p) => {
             const id = PILLAR_NAME_TO_ID[p.name];
             const icon = ICON_MAP[p.name] || Briefcase;

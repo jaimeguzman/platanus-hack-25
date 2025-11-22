@@ -274,7 +274,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   // Computed
   getFilteredNotes: () => {
-    const { notes, searchQuery, selectedPillar, showFavoritesOnly } = get();
+    const { notes, selectedPillar, showFavoritesOnly } = get();
     // Las notas ya vienen filtradas por búsqueda desde Supabase si hay searchQuery
     // Solo aplicamos filtros adicionales de pilar y favoritos
     return notes.filter((note) => {

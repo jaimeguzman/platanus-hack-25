@@ -27,9 +27,10 @@ async function getProjectIdByPillar(pillar: 'career' | 'social' | 'hobby'): Prom
     .limit(1)
     .single();
   
-  if (data?.id) {
-    PILLAR_TO_PROJECT_ID[pillar] = data.id;
-    return data.id;
+  const projectData = data as { id: string } | null;
+  if (projectData?.id) {
+    PILLAR_TO_PROJECT_ID[pillar] = projectData.id;
+    return projectData.id;
   }
   
   throw new NoteServiceError(`Project not found for pillar: ${pillar}`, ERROR_CODES.NOT_FOUND);
@@ -477,8 +478,8 @@ export async function searchNotes(query: string): Promise<Note[]> {
 
     // Filtrar por tags si el query coincide (búsqueda en memoria sobre tags)
     const queryLower = query.toLowerCase().trim();
-    const filteredByTags = notesData.filter((note) => {
-      const tags = Array.isArray(note.tags) ? note.tags : [];
+    const filteredByTags = (notesData as Array<Record<string, unknown>>).filter((note) => {
+      const tags = Array.isArray(note.tags) ? (note.tags as string[]) : [];
       return tags.some((tag: string) => tag.toLowerCase().includes(queryLower));
     });
 

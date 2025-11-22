@@ -13,9 +13,7 @@ import {
   PILLAR_COLORS,
   PILLAR_COLORS_SVG,
   D3_SIMULATION,
-  D3_ZOOM,
   ANIMATION_DURATION,
-  UI_DIMENSIONS,
 } from '@/constants';
 
 type InteractionMode = 'nodes' | 'pan' | 'zoom';
@@ -46,7 +44,7 @@ export function GraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('nodes');
   const [mounted, setMounted] = useState(false);
 
@@ -263,7 +261,7 @@ export function GraphView() {
         return isDarkMode ? colors.dark : colors.light;
       })
       .attr('stroke-width', isDarkMode ? '2' : '1')
-      .attr('class', (d) => {
+      .attr('class', () => {
         const cursorClass = interactionMode === 'nodes' ? 'cursor-move' : 'cursor-pointer';
         return `${cursorClass} transition-all hover:opacity-80`;
       })
@@ -365,7 +363,7 @@ export function GraphView() {
 
     if (interactionMode === 'zoom') {
       // Modo zoom: permite zoom con rueda y arrastre
-      zoomRef.current.filter(null);
+      zoomRef.current.filter(() => true);
     } else if (interactionMode === 'pan') {
       // Modo pan: solo permite arrastre, sin zoom con rueda
       zoomRef.current.filter((event) => {
@@ -402,10 +400,8 @@ export function GraphView() {
       .scale(APP_CONFIG.ZOOM_INITIAL_SCALE)
       .translate(-width / 2, -height / 2);
     
-    svg.transition().duration(ANIMATION_DURATION.ZOOM_RESET).call(
-      zoomRef.current.transform,
-      initialTransform,
-    );
+    // Solución simple: usar exactamente la misma técnica que en la inicialización (línea 235)
+    svg.call(zoomRef.current.transform, initialTransform);
   };
 
   const handleZoomIn = () => {
