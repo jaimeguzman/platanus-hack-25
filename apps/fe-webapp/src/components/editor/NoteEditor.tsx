@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, Eye, Edit, X, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Components } from 'react-markdown';
@@ -200,7 +201,7 @@ export function NoteEditor() {
           />
         ) : (
           <div className="prose prose-sm prose-slate max-w-none p-6 dark:prose-invert">
-            <ReactMarkdown components={markdownComponents}>
+            <ReactMarkdown rehypePlugins={[rehypeRaw]} components={markdownComponents}>
               {editorContent || UI_MESSAGES.NO_CONTENT}
             </ReactMarkdown>
           </div>

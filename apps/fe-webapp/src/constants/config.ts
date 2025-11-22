@@ -40,6 +40,10 @@ export const UI_MESSAGES = {
   NOTE_TITLE_PLACEHOLDER: 'Título de la nota...',
   NOTE_CONTENT_PLACEHOLDER: 'Escribe tu nota en Markdown...',
   TAG_PLACEHOLDER: 'Agregar etiqueta...',
+  NEW_VOICE_NOTE_TITLE: 'Nota de Voz',
+  RECORDING: 'Grabando...',
+  AUDIO_RECORDED: 'Audio grabado',
+  PRESS_TO_START: 'Presiona el botón para comenzar',
 } as const;
 
 export const PILLAR_COLORS = {

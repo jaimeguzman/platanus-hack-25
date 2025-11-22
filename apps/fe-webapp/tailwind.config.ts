@@ -44,6 +44,16 @@ const config: Config = {
         border: 'hsl(214.3, 31.8%, 91.4%)',
         input: 'hsl(214.3, 31.8%, 91.4%)',
         ring: 'hsl(222.2, 84%, 4.9%)',
+        sidebar: {
+          DEFAULT: 'hsl(0 0% 98%)',
+          foreground: 'hsl(240 5.3% 26.1%)',
+          primary: 'hsl(240 5.9% 10%)',
+          'primary-foreground': 'hsl(0 0% 98%)',
+          accent: 'hsl(240 4.8% 95.9%)',
+          'accent-foreground': 'hsl(240 5.9% 10%)',
+          border: 'hsl(220 13% 91%)',
+          ring: 'hsl(217.2 91.2% 59.8%)',
+        },
       },
       borderRadius: {
         lg: '0.5rem',
