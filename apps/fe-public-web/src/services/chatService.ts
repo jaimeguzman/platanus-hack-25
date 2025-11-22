@@ -1,13 +1,18 @@
 'use client';
 
 import { Message, MessageType, MessageStatus, ChatPayload } from '@/types/chat';
+import { env } from '@/config/env';
 
 class ChatService {
   private static instance: ChatService;
   private messages: Message[] = [];
   private apiBaseUrl: string | null = null;
+  private onMessagesChange?: () => void;
 
-  private constructor() {}
+  private constructor() {
+    // Initialize with speech-to-text API URL
+    this.apiBaseUrl = env.speechToTextApiUrl;
+  }
 
   static getInstance(): ChatService {
     if (!ChatService.instance) {
@@ -18,6 +23,16 @@ class ChatService {
 
   setApiUrl(url: string) {
     this.apiBaseUrl = url;
+  }
+
+  setOnMessagesChange(callback: () => void) {
+    this.onMessagesChange = callback;
+  }
+
+  private notifyChange() {
+    if (this.onMessagesChange) {
+      this.onMessagesChange();
+    }
   }
 
   getMessages(): Message[] {
@@ -68,61 +83,113 @@ class ChatService {
 
     try {
       await this.sendToApi(message);
-      message.status = MessageStatus.Sent;
+      // Status is updated inside sendAudioToTranscriptionApi
     } catch (error) {
       message.status = MessageStatus.Error;
+      if (error instanceof Error) {
+        message.errorMessage = error.message;
+      }
     }
 
     return message;
   }
 
   private async sendToApi(message: Message): Promise<void> {
-    // Construir el payload
-    const payload: ChatPayload = {
-      id: message.id,
-      type: message.type,
-      text: message.text,
-      audioFileName: message.audioFileName,
-      audioDuration: message.audioDuration,
-      audioBase64: message.audioData
-        ? this.arrayBufferToBase64(message.audioData)
-        : undefined,
-      audioSize: message.audioData?.length,
-      timestamp: message.timestamp.toISOString(),
-    };
-
-    // Imprimir el request en consola
-    console.log('═══════════════════════════════════════════');
-    console.log('📤 API REQUEST');
-    console.log('═══════════════════════════════════════════');
-    console.log('URL:', this.apiBaseUrl ?? 'No configurada');
-    console.log('Payload:');
-
-    // Imprimir JSON formateado (sin el audio base64 completo para legibilidad)
-    const payloadForLog = { ...payload };
-    if (payloadForLog.audioBase64) {
-      const audioBase64 = payloadForLog.audioBase64;
-      payloadForLog.audioBase64 = `${audioBase64.substring(0, 50)}... (${audioBase64.length} chars)`;
-    }
-    console.log(JSON.stringify(payloadForLog, null, 2));
-    console.log('═══════════════════════════════════════════');
-
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (!this.apiBaseUrl) {
-      // API no configurada, solo guardamos en memoria
+    // For audio messages, send to transcription API
+    if (message.type === MessageType.Audio && message.audioData) {
+      await this.sendAudioToTranscriptionApi(message);
       return;
     }
 
-    // TODO: Implementar llamada real al API cuando esté disponible
-    // const response = await fetch(this.apiBaseUrl, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(payload),
-    // });
+    // For text messages, just log for now
+    if (message.type === MessageType.Text) {
+      console.log('📝 Text message:', message.text);
+      message.status = MessageStatus.Sent;
+      return;
+    }
+  }
+
+  private async sendAudioToTranscriptionApi(message: Message): Promise<void> {
+    if (!message.audioData) {
+      throw new Error('No audio data available');
+    }
+
+    // Update status to transcribing at the start
+    message.status = MessageStatus.Transcribing;
+    this.notifyChange();
+
+    const audioBase64 = this.arrayBufferToBase64(message.audioData);
+    
+    // Prepare transcription request payload
+    const transcriptionPayload = {
+      audio_base64: audioBase64,
+      filename: message.audioFileName || 'audio.webm',
+      category: 'chat_audio',
+      source: 'web_chat'
+    };
+
+    // Log the request for debugging
+    console.log('═══════════════════════════════════════════');
+    console.log('🎤 TRANSCRIPTION API REQUEST');
+    console.log('═══════════════════════════════════════════');
+    console.log('URL:', `${this.apiBaseUrl}/transcribe`);
+    console.log('Payload:', {
+      ...transcriptionPayload,
+      audio_base64: `${audioBase64.substring(0, 50)}... (${audioBase64.length} chars)`
+    });
+    console.log('═══════════════════════════════════════════');
+
+    if (!this.apiBaseUrl) {
+      message.status = MessageStatus.Error;
+      message.errorMessage = 'Speech-to-text API URL not configured';
+      this.notifyChange();
+      throw new Error('Speech-to-text API URL not configured');
+    }
+
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/transcribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transcriptionPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        message.status = MessageStatus.Error;
+        message.errorMessage = `API Error: ${response.status} - ${errorText}`;
+        this.notifyChange();
+        throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      // Log the successful response
+      console.log('✅ TRANSCRIPTION SUCCESS');
+      console.log('Transcription result:', result.transcription);
+      console.log('Memory stored:', result.memory);
+      
+      // Update message with transcription result and mark as sent
+      if (result.transcription?.text) {
+        message.transcriptionText = result.transcription.text;
+      }
+      
+      // Mark as successfully sent only after getting the transcription
+      message.status = MessageStatus.Sent;
+      this.notifyChange();
+      
+    } catch (error) {
+      console.error('❌ TRANSCRIPTION ERROR:', error);
+      message.status = MessageStatus.Error;
+      if (error instanceof Error) {
+        message.errorMessage = error.message;
+      } else {
+        message.errorMessage = 'Unknown transcription error';
+      }
+      this.notifyChange();
+      throw error;
+    }
   }
 
   async retryMessage(messageId: string): Promise<void> {

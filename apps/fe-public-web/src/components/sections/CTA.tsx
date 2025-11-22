@@ -6,7 +6,7 @@ export function CTA() {
   return (
     <section className="py-20 border-t border-[#2A2A2A]">
       <div className="container-custom">
-        <div className="rounded-xl border border-accent/30 bg-gradient-to-r from-blue-600/10 via-accent/5 to-transparent p-12 text-center">
+        <div className="rounded-xl border border-accent/30 bg-linear-to-r from-blue-600/10 via-accent/5 to-transparent p-12 text-center">
           <h2 className="heading-h2 mb-4">
             Libera el Poder de tu Conocimiento
           </h2>
