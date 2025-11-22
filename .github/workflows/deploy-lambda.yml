@@ -30,12 +30,22 @@ jobs:
       - name: Install Python dependencies in the target directory
         run: |
           cd apis/rag_memory
-          pip install -r requirements.txt -t .
+          pip install -r requirements.txt -t . --no-cache-dir
       
-      - name: Zip entire project for Lambda
+      - name: Clean unnecessary files
         run: |
           cd apis/rag_memory
-          zip -r ../../rag_memory.zip .
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete
+          find . -name "*.pyo" -delete
+          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.md" -delete 2>/dev/null || true
+          find . -name "LICENSE*" -delete 2>/dev/null || true
+      
+      - name: Zip project for Lambda
+        run: |
+          cd apis/rag_memory
+          zip -r ../../rag_memory.zip . -x "*.git*" "__pycache__/*"
           cd ../../
           
       - name: Deploy to AWS Lambda
