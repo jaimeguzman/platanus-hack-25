@@ -12,7 +12,9 @@ load_dotenv()
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from services.rag_memory import RagMemoryService
+# Import RagMemoryService directly to avoid __init__.py issues
+sys.path.insert(0, str(project_root / "apis" / "rag_memory"))
+from rag_service import RagMemoryService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

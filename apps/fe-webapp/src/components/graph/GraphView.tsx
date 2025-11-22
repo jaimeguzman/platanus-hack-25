@@ -1,349 +1,355 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
-import { usePKMStore } from '@/stores/pkmStore';
-import { GraphNode, GraphEdge } from '@/types/note';
-import { ZoomIn, ZoomOut, RotateCcw, Maximize, Minimize } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import * as d3 from 'd3';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fetchGraphData } from '@/services/ragService';
+import type { D3Node, D3Edge } from '@/types/graph';
 
-// Colores para el grafo
+// Colors for the graph
 const GRAPH_COLORS = {
-  note: '#8B5CF6',      // Violeta para notas
-  tag: '#10B981',       // Verde para tags
-  backlink: '#3B82F6',  // Azul para backlinks
-  edge: '#6366F1',      // Indigo para conexiones
-  edgeTag: '#10B981',   // Verde para conexiones de tags
-  text: '#E5E7EB',      // Gris claro para texto
-  textMuted: '#9CA3AF', // Gris para texto secundario
-  background: '#0A0A0A', // Fondo oscuro
-  cardBg: '#18181B',    // Fondo de cards
-  border: '#27272A',    // Bordes
+  memory: '#8B5CF6',    // Violet for memories
+  note: '#3B82F6',      // Blue for notes
+  tag: '#10B981',       // Green for tags
+  edge: '#6366F1',      // Indigo for connections
+  edgeWeak: '#4B5563',  // Gray for weak connections
+  text: '#E5E7EB',      // Light gray for text
+  textMuted: '#9CA3AF', // Gray for secondary text
+  background: '#0A0A0A', // Dark background
+  cardBg: '#18181B',    // Card background
+  border: '#27272A',    // Borders
 };
 
+// Color palette for different categories
+const CATEGORY_COLORS = [
+  '#8B5CF6', // Violet
+  '#3B82F6', // Blue
+  '#10B981', // Green
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#EC4899', // Pink
+  '#8B5CF6', // Purple
+  '#06B6D4', // Cyan
+  '#84CC16', // Lime
+  '#F97316', // Orange
+  '#6366F1', // Indigo
+  '#14B8A6', // Teal
+];
+
 const GraphView: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { notes, projects, setActiveNote, setViewMode, viewMode } = usePKMStore();
-  const [nodes, setNodes] = useState<GraphNode[]>([]);
-  const [edges, setEdges] = useState<GraphEdge[]>([]);
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [graphData, setGraphData] = useState<{ nodes: D3Node[], edges: D3Edge[] }>({ nodes: [], edges: [] });
+  const [stats, setStats] = useState({ nodeCount: 0, edgeCount: 0 });
+  const [categoryColorMap, setCategoryColorMap] = useState<Map<string, string>>(new Map());
+  const simulationRef = useRef<d3.Simulation<D3Node, D3Edge> | null>(null);
 
-  // Reset estados al montar
-  useEffect(() => {
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
-    setIsDragging(false);
-    setHoveredNode(null);
-    setIsReady(false);
-
-    // Marcar como listo después de un breve delay
-    const timer = setTimeout(() => setIsReady(true), 50);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Resize canvas to container
+  // Update dimensions on resize
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
         const { width, height } = containerRef.current.getBoundingClientRect();
-        // Solo actualizar si tiene tamaño válido
         if (width > 0 && height > 0) {
-          setCanvasSize({ width, height });
+          setDimensions({ width, height });
         }
       }
     };
 
-    // Usar requestAnimationFrame para asegurar que el DOM está listo
-    const rafId = requestAnimationFrame(() => {
-      updateSize();
-    });
-
-    // También usar un pequeño delay como fallback
-    const timeoutId = setTimeout(updateSize, 100);
-
+    updateSize();
     window.addEventListener('resize', updateSize);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', updateSize);
-    };
+    return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Get project color for a note
-  const getProjectColor = (projectId: string | undefined) => {
-    if (!projectId) return GRAPH_COLORS.note;
-    const project = projects.find(p => p.id === projectId);
-    return project?.color || GRAPH_COLORS.note;
+  // Fetch graph data from API
+  const loadGraphData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchGraphData(500);
+      
+      // Build category to color mapping
+      const categories = new Set<string>();
+      data.nodes.forEach(node => {
+        if (node.category) {
+          categories.add(node.category);
+        }
+      });
+
+      const colorMap = new Map<string, string>();
+      Array.from(categories).forEach((category, index) => {
+        colorMap.set(category, CATEGORY_COLORS[index % CATEGORY_COLORS.length]);
+      });
+      setCategoryColorMap(colorMap);
+
+      // Transform API data to D3 format
+      const nodes: D3Node[] = data.nodes.map(node => ({
+        ...node,
+        color: getNodeColor(node.type, node.category, colorMap),
+        size: getNodeSize(node.type),
+      }));
+
+      const edges: D3Edge[] = data.edges.map(edge => ({
+        source: edge.source,
+        target: edge.target,
+        weight: edge.weight,
+        strength: edge.weight * 0.5, // Scale weight to strength
+      }));
+
+      setGraphData({ nodes, edges });
+      setStats({
+        nodeCount: data.metadata.node_count,
+        edgeCount: data.metadata.edge_count,
+      });
+    } catch (err) {
+      console.error('Error loading graph data:', err);
+      setError('Failed to load graph data. Make sure the RAG API is running.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Load data on mount
+  useEffect(() => {
+    loadGraphData();
+  }, [loadGraphData]);
+
+  // Get node color based on type and category
+  const getNodeColor = (type: string, category?: string, colorMap?: Map<string, string>): string => {
+    // If there's a category and we have a color mapping, use it
+    if (category && colorMap && colorMap.has(category)) {
+      return colorMap.get(category)!;
+    }
+    
+    // Fallback to type-based colors
+    if (type === 'memory') return GRAPH_COLORS.memory;
+    if (type === 'note') return GRAPH_COLORS.note;
+    if (type === 'tag') return GRAPH_COLORS.tag;
+    return GRAPH_COLORS.memory;
   };
 
-  // Generate graph data from notes
+  // Get node size based on type
+  const getNodeSize = (type: string): number => {
+    if (type === 'memory') return 8;
+    if (type === 'note') return 10;
+    if (type === 'tag') return 6;
+    return 8;
+  };
+
+  // Initialize D3 force simulation and render
   useEffect(() => {
-    const newNodes: GraphNode[] = [];
-    const newEdges: GraphEdge[] = [];
-    const centerX = canvasSize.width / 2;
-    const centerY = canvasSize.height / 2;
-    const radius = Math.min(canvasSize.width, canvasSize.height) * 0.3;
+    if (!svgRef.current || graphData.nodes.length === 0) return;
 
-    // Add note nodes
-    notes.forEach((note, index) => {
-      const angle = (index / Math.max(notes.length, 1)) * 2 * Math.PI - Math.PI / 2;
+    const svg = d3.select(svgRef.current);
+    const { width, height } = dimensions;
 
-      newNodes.push({
-        id: note.id,
-        label: note.title.length > 20 ? note.title.substring(0, 20) + '...' : note.title,
-        type: 'note',
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius,
-        color: getProjectColor(note.projectId),
-        size: 12
+    // Clear previous content
+    svg.selectAll('*').remove();
+
+    // Create main group for zoom/pan
+    const g = svg.append('g');
+
+    // Calculate initial zoom based on number of nodes
+    const nodeCount = graphData.nodes.length;
+    let initialScale = 1;
+    
+    if (nodeCount > 100) {
+      initialScale = 0.3;
+    } else if (nodeCount > 50) {
+      initialScale = 0.5;
+    } else if (nodeCount > 30) {
+      initialScale = 0.7;
+    } else if (nodeCount > 10) {
+      initialScale = 0.85;
+    }
+
+    // Setup zoom behavior
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform);
       });
 
-      // Add edges for backlinks
-      if (note.backlinks) {
-        note.backlinks.forEach(backlinkId => {
-          if (notes.find(n => n.id === backlinkId)) {
-            newEdges.push({
-              source: note.id,
-              target: backlinkId,
-              type: 'backlink',
-              strength: 0.8
-            });
-          }
-        });
-      }
+    svg.call(zoom);
 
-      // Add edges for shared tags
-      note.tags.forEach(tag => {
-        const tagId = `tag-${tag}`;
-        if (!newNodes.find(n => n.id === tagId)) {
-          const tagAngle = Math.random() * 2 * Math.PI;
-          const tagRadius = radius + 80;
-          newNodes.push({
-            id: tagId,
-            label: `#${tag}`,
-            type: 'tag',
-            x: centerX + Math.cos(tagAngle) * tagRadius,
-            y: centerY + Math.sin(tagAngle) * tagRadius,
-            color: GRAPH_COLORS.tag,
-            size: 8
-          });
-        }
-        newEdges.push({
-          source: note.id,
-          target: tagId,
-          type: 'tag',
-          strength: 0.4
-        });
-      });
-    });
+    // Apply initial zoom
+    const initialTransform = d3.zoomIdentity
+      .translate(width / 2, height / 2)
+      .scale(initialScale)
+      .translate(-width / 2, -height / 2);
+    
+    svg.call(zoom.transform, initialTransform);
 
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [notes, projects, canvasSize]);
+    // Create force simulation
+    const simulation = d3.forceSimulation<D3Node>(graphData.nodes)
+      .force('link', d3.forceLink<D3Node, D3Edge>(graphData.edges)
+        .id(d => d.id)
+        .distance(d => 100 / (d.weight + 0.1)) // Closer for higher weights
+        .strength(d => d.strength || 0.5)
+      )
+      .force('charge', d3.forceManyBody()
+        .strength(-300)
+        .distanceMax(400)
+      )
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide<D3Node>().radius(d => (d.size || 8) + 10));
 
-  // Draw the graph
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    simulationRef.current = simulation;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas with background
-    ctx.fillStyle = GRAPH_COLORS.background;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw grid pattern
-    ctx.strokeStyle = GRAPH_COLORS.border;
-    ctx.lineWidth = 0.5;
-    ctx.globalAlpha = 0.3;
-    const gridSize = 40 * zoom;
-    for (let x = offset.x % gridSize; x < canvas.width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = offset.y % gridSize; y < canvas.height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    // Apply transformations
-    ctx.save();
-    ctx.translate(offset.x, offset.y);
-    ctx.scale(zoom, zoom);
-
-    // Draw edges with glow effect
-    edges.forEach(edge => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
-
-      if (sourceNode && targetNode && sourceNode.x && sourceNode.y && targetNode.x && targetNode.y) {
-        const edgeColor = edge.type === 'tag' ? GRAPH_COLORS.edgeTag : GRAPH_COLORS.edge;
-
-        // Glow effect
-        ctx.beginPath();
-        ctx.moveTo(sourceNode.x, sourceNode.y);
-        ctx.lineTo(targetNode.x, targetNode.y);
-        ctx.strokeStyle = edgeColor;
-        ctx.lineWidth = (edge.strength || 0.5) * 4;
-        ctx.globalAlpha = 0.1;
-        ctx.stroke();
-
-        // Main line
-        ctx.beginPath();
-        ctx.moveTo(sourceNode.x, sourceNode.y);
-        ctx.lineTo(targetNode.x, targetNode.y);
-        ctx.strokeStyle = edgeColor;
-        ctx.lineWidth = (edge.strength || 0.5) * 1.5;
-        ctx.globalAlpha = 0.5;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    });
+    // Draw edges
+    const link = g.append('g')
+      .selectAll('line')
+      .data(graphData.edges)
+      .join('line')
+      .attr('stroke', d => d.weight > 0.5 ? GRAPH_COLORS.edge : GRAPH_COLORS.edgeWeak)
+      .attr('stroke-opacity', d => 0.3 + (d.weight * 0.5))
+      .attr('stroke-width', d => 1 + (d.weight * 3));
 
     // Draw nodes
-    nodes.forEach(node => {
-      if (node.x && node.y) {
-        const isHovered = hoveredNode === node.id;
-        const nodeSize = (node.size || 8) * (isHovered ? 1.3 : 1);
+    const node = g.append('g')
+      .selectAll('circle')
+      .data(graphData.nodes)
+      .join('circle')
+      .attr('r', d => d.size || 8)
+      .attr('fill', d => d.color || GRAPH_COLORS.memory)
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 2)
+      .style('cursor', 'pointer')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .call(drag(simulation) as any);
 
-        // Glow effect
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, nodeSize + 8, 0, 2 * Math.PI);
-        ctx.fillStyle = node.color || GRAPH_COLORS.note;
-        ctx.globalAlpha = 0.15;
-        ctx.fill();
-        ctx.globalAlpha = 1;
+    // Add labels
+    const label = g.append('g')
+      .selectAll('text')
+      .data(graphData.nodes)
+      .join('text')
+      .text(d => d.label.length > 30 ? d.label.substring(0, 30) + '...' : d.label)
+      .attr('font-size', 10)
+      .attr('dx', 12)
+      .attr('dy', 4)
+      .attr('fill', GRAPH_COLORS.text)
+      .style('pointer-events', 'none')
+      .style('user-select', 'none');
 
-        // Node circle
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
-        ctx.fillStyle = node.color || GRAPH_COLORS.note;
-        ctx.fill();
+    // Add hover effects
+    node
+      .on('mouseover', function(event, d) {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr('r', (d.size || 8) * 1.5)
+          .attr('stroke-width', 3);
 
-        // Border
-        ctx.strokeStyle = GRAPH_COLORS.background;
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        // Highlight connected edges
+        link
+          .transition()
+          .duration(200)
+          .attr('stroke-opacity', l => {
+            const source = typeof l.source === 'object' ? l.source.id : l.source;
+            const target = typeof l.target === 'object' ? l.target.id : l.target;
+            return (source === d.id || target === d.id) ? 0.8 : 0.1;
+          });
+      })
+      .on('mouseout', function(event, d) {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr('r', d.size || 8)
+          .attr('stroke-width', 2);
 
-        // Node label
-        ctx.fillStyle = node.type === 'tag' ? GRAPH_COLORS.tag : GRAPH_COLORS.text;
-        ctx.font = node.type === 'tag' ? '11px system-ui' : '12px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(node.label, node.x, node.y + nodeSize + 16);
-      }
-    });
-
-    ctx.restore();
-  }, [nodes, edges, zoom, offset, hoveredNode, canvasSize]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Si hubo movimiento significativo del mouse, no es un clic sino un drag
-    if (mouseDownPos) {
-      const dx = Math.abs(e.clientX - mouseDownPos.x);
-      const dy = Math.abs(e.clientY - mouseDownPos.y);
-      if (dx > 5 || dy > 5) {
-        return; // Fue un drag, no un click
-      }
-    }
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - offset.x) / zoom;
-    const y = (e.clientY - rect.top - offset.y) / zoom;
-
-    // Find clicked node - usar radio más grande para mejor detección
-    const clickedNode = nodes.find(node => {
-      if (!node.x || !node.y || !node.size) return false;
-      const distance = Math.sqrt(Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2));
-      return distance <= (node.size || 12) + 10; // Radio de detección más grande
-    });
-
-    if (clickedNode && clickedNode.type === 'note') {
-      setActiveNote(clickedNode.id);
-      setViewMode('editor'); // Cambiar a vista editor al hacer clic
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Guardar posición inicial para detectar si es click o drag
-    setMouseDownPos({ x: e.clientX, y: e.clientY });
-
-    // Solo iniciar drag si no estamos sobre un nodo clickeable
-    if (!hoveredNode || nodes.find(n => n.id === hoveredNode)?.type !== 'note') {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setMouseDownPos(null);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-    setHoveredNode(null);
-    setMouseDownPos(null);
-  };
-
-  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
-  const handleResetView = () => {
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
-  };
-
-
-  const handleMouseMoveForHover = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - offset.x) / zoom;
-    const y = (e.clientY - rect.top - offset.y) / zoom;
-
-    const hovered = nodes.find(node => {
-      if (!node.x || !node.y || !node.size) return false;
-      const distance = Math.sqrt(Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2));
-      return distance <= node.size + 5;
-    });
-
-    setHoveredNode(hovered?.id || null);
-
-    if (isDragging) {
-      setOffset({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        // Reset edge opacity
+        link
+          .transition()
+          .duration(200)
+          .attr('stroke-opacity', l => 0.3 + (l.weight * 0.5));
+      })
+      .on('click', function(event, d) {
+        console.log('Clicked node:', d);
+        // TODO: Add navigation or detail view
       });
+
+    // Update positions on simulation tick
+    simulation.on('tick', () => {
+      link
+        .attr('x1', d => (typeof d.source === 'object' ? d.source.x : 0) || 0)
+        .attr('y1', d => (typeof d.source === 'object' ? d.source.y : 0) || 0)
+        .attr('x2', d => (typeof d.target === 'object' ? d.target.x : 0) || 0)
+        .attr('y2', d => (typeof d.target === 'object' ? d.target.y : 0) || 0);
+
+      node
+        .attr('cx', d => d.x || 0)
+        .attr('cy', d => d.y || 0);
+
+      label
+        .attr('x', d => d.x || 0)
+        .attr('y', d => d.y || 0);
+    });
+
+    // Drag behavior
+    function drag(simulation: d3.Simulation<D3Node, D3Edge>) {
+      function dragstarted(event: d3.D3DragEvent<SVGCircleElement, D3Node, D3Node>) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+      }
+
+      function dragged(event: d3.D3DragEvent<SVGCircleElement, D3Node, D3Node>) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+      }
+
+      function dragended(event: d3.D3DragEvent<SVGCircleElement, D3Node, D3Node>) {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+      }
+
+      return d3.drag<SVGCircleElement, D3Node>()
+        .on('start', dragstarted)
+        .on('drag', dragged)
+        .on('end', dragended);
     }
+
+    return () => {
+      simulation.stop();
+    };
+  }, [graphData, dimensions]);
+
+
+  const handleRefresh = () => {
+    loadGraphData();
   };
 
-  const noteNodes = nodes.filter(n => n.type === 'note');
-  const tagNodes = nodes.filter(n => n.type === 'tag');
-
-  // Mostrar loading mientras se inicializa
-  if (!isReady) {
+  // Loading state
+  if (isLoading) {
     return (
       <div ref={containerRef} className="flex-1 relative flex items-center justify-center" style={{ backgroundColor: GRAPH_COLORS.background }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p style={{ color: GRAPH_COLORS.textMuted }} className="text-sm">Cargando visor...</p>
+          <p style={{ color: GRAPH_COLORS.textMuted }} className="text-sm">Loading graph...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div ref={containerRef} className="flex-1 relative flex items-center justify-center" style={{ backgroundColor: GRAPH_COLORS.background }}>
+        <div className="text-center max-w-md">
+          <div className="text-red-500 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button onClick={handleRefresh} variant="outline" className="bg-violet-600 hover:bg-violet-700 text-white border-violet-500">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -351,53 +357,7 @@ const GraphView: React.FC = () => {
 
   return (
     <div ref={containerRef} className="flex-1 relative" style={{ backgroundColor: GRAPH_COLORS.background }}>
-      {/* Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-        <div className="flex gap-1 p-1.5 rounded-xl border" style={{ backgroundColor: GRAPH_COLORS.cardBg, borderColor: GRAPH_COLORS.border }}>
-          <Button
-            onClick={() => setViewMode(viewMode === 'graph' ? 'split' : 'graph')}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-white/10 text-white"
-            title={viewMode === 'graph' ? 'Salir de pantalla completa' : 'Pantalla completa'}
-          >
-            {viewMode === 'graph' ? (
-              <Minimize className="w-4 h-4" />
-            ) : (
-              <Maximize className="w-4 h-4" />
-            )}
-          </Button>
-          <div className="w-px bg-white/10 mx-0.5" />
-          <Button
-            onClick={handleZoomIn}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-white/10 text-white"
-            title="Acercar"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={handleZoomOut}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-white/10 text-white"
-            title="Alejar"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </Button>
-          <div className="w-px bg-white/10 mx-0.5" />
-          <Button
-            onClick={handleResetView}
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-white/10 text-white"
-            title="Restablecer vista"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+
 
       {/* Graph Info */}
       <div
@@ -405,56 +365,53 @@ const GraphView: React.FC = () => {
         style={{ backgroundColor: GRAPH_COLORS.cardBg, borderColor: GRAPH_COLORS.border }}
       >
         <h3 className="text-sm font-semibold mb-3" style={{ color: GRAPH_COLORS.text }}>
-          Visor Gráfico
+          Memory Graph
         </h3>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: GRAPH_COLORS.note }} />
-            <span style={{ color: GRAPH_COLORS.textMuted }}>Notas: {noteNodes.length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: GRAPH_COLORS.tag }} />
-            <span style={{ color: GRAPH_COLORS.textMuted }}>Tags: {tagNodes.length}</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: GRAPH_COLORS.memory }} />
+            <span style={{ color: GRAPH_COLORS.textMuted }}>Nodes: {stats.nodeCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-0.5" style={{ backgroundColor: GRAPH_COLORS.edge }} />
-            <span style={{ color: GRAPH_COLORS.textMuted }}>Conexiones: {edges.length}</span>
+            <span style={{ color: GRAPH_COLORS.textMuted }}>Connections: {stats.edgeCount}</span>
           </div>
         </div>
+
+        {/* Categories Legend */}
+        {categoryColorMap.size > 0 && (
+          <div className="mt-4 pt-3 border-t" style={{ borderColor: GRAPH_COLORS.border }}>
+            <h4 className="text-xs font-semibold mb-2" style={{ color: GRAPH_COLORS.text }}>
+              Categories
+            </h4>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {Array.from(categoryColorMap.entries()).map(([category, color]) => (
+                <div key={category} className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-xs truncate" style={{ color: GRAPH_COLORS.textMuted }}>
+                    {category || 'Uncategorized'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="mt-3 text-xs" style={{ color: GRAPH_COLORS.textMuted }}>
-          Clic en nodos para abrir notas
+          Drag nodes to rearrange
         </p>
         <p className="text-xs" style={{ color: GRAPH_COLORS.textMuted }}>
-          Arrastra para mover el grafo
+          Scroll to zoom, drag to pan
         </p>
       </div>
 
-      {/* Zoom indicator */}
-      <div
-        className="absolute bottom-4 right-4 z-10 px-3 py-1.5 rounded-lg text-xs font-medium"
-        style={{ backgroundColor: GRAPH_COLORS.cardBg, color: GRAPH_COLORS.textMuted, borderColor: GRAPH_COLORS.border, borderWidth: 1 }}
-      >
-        {Math.round(zoom * 100)}%
-      </div>
-
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        width={canvasSize.width}
-        height={canvasSize.height}
+      {/* SVG Canvas */}
+      <svg
+        ref={svgRef}
+        width={dimensions.width}
+        height={dimensions.height}
         className="w-full h-full"
-        style={{
-          cursor: hoveredNode && nodes.find(n => n.id === hoveredNode)?.type === 'note'
-            ? 'pointer'
-            : isDragging
-              ? 'grabbing'
-              : 'grab'
-        }}
-        onClick={handleCanvasClick}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMoveForHover}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
+        style={{ cursor: 'grab' }}
       />
     </div>
   );
