@@ -3,50 +3,18 @@ export interface Note {
   title: string;
   content: string;
   tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  projectId?: string;
-  isPinned?: boolean;
-  backlinks?: string[];
+  pillar: 'career' | 'social' | 'hobby';
+  isFavorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+  linkedNotes?: string[];
 }
 
-export interface Project {
+export interface NoteMetadata {
   id: string;
-  name: string;
-  color: string;
-  icon?: string;
-  createdAt: Date;
-  noteCount?: number;
+  title: string;
+  tags: string[];
+  pillar: 'career' | 'social' | 'hobby';
+  updatedAt: string;
 }
 
-export interface GraphNode {
-  id: string;
-  label: string;
-  type: 'note' | 'tag' | 'project';
-  x?: number;
-  y?: number;
-  color?: string;
-  size?: number;
-}
-
-export interface GraphEdge {
-  source: string;
-  target: string;
-  type: 'link' | 'tag' | 'backlink';
-  strength?: number;
-}
-
-export interface SearchResult {
-  note: Note;
-  score: number;
-  highlights: string[];
-}
-
-export interface AudioTranscription {
-  id: string;
-  audioUrl: string;
-  text: string;
-  duration: number;
-  createdAt: Date;
-  noteId?: string;
-}
