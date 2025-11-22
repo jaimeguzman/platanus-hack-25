@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/chat_screen.dart';
 
 void main() {
@@ -26,31 +27,66 @@ class _ChatAppState extends State<ChatApp> {
 
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
+  static const _primaryColor = Color(0xFF5B4CDB);
+  static const _secondaryColor = Color(0xFF00B894);
+
   @override
   Widget build(BuildContext context) {
+    final lightColorScheme = ColorScheme.fromSeed(
+      seedColor: _primaryColor,
+      secondary: _secondaryColor,
+      brightness: Brightness.light,
+    );
+
+    final darkColorScheme = ColorScheme.fromSeed(
+      seedColor: _primaryColor,
+      secondary: _secondaryColor,
+      brightness: Brightness.dark,
+    );
+
     return MaterialApp(
-      title: 'Voice Chat',
+      title: 'Cogni+',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.light,
-        ),
+        colorScheme: lightColorScheme,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
+        textTheme: GoogleFonts.interTextTheme(
+          ThemeData.light().textTheme,
+        ),
+        appBarTheme: AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          backgroundColor: lightColorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: lightColorScheme.surfaceContainerHighest,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.dark,
-        ),
+        colorScheme: darkColorScheme,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
+        textTheme: GoogleFonts.interTextTheme(
+          ThemeData.dark().textTheme,
+        ),
+        appBarTheme: AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          backgroundColor: darkColorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: darkColorScheme.surfaceContainerHighest,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
       themeMode: _themeMode,

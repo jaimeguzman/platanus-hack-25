@@ -6,7 +6,7 @@ import Editor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Eye, Edit3, Save, Hash, Calendar, Download, Plus, X } from 'lucide-react';
+import { Eye, Edit3, Save, Hash, Calendar, Download, Plus, X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import { cn } from '@/utils/cn';
 import { exportToMarkdown, downloadMarkdown } from '@/utils/export';
 
 const NoteEditor: React.FC = () => {
-  const { activeNoteId, getNoteById, updateNote, projects } = usePKMStore();
+  const { activeNoteId, getNoteById, updateNote, projects, togglePinned } = usePKMStore();
   const [isPreview, setIsPreview] = useState(false);
   const [localContent, setLocalContent] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -76,81 +76,139 @@ const NoteEditor: React.FC = () => {
     }
   }, [activeNote]);
 
+  const handleTogglePinned = useCallback(() => {
+    if (activeNoteId) {
+      togglePinned(activeNoteId);
+    }
+  }, [activeNoteId, togglePinned]);
+
   if (!activeNote) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#111111]">
-        <div className="text-center max-w-md px-6">
-          <Edit3 className="w-20 h-20 text-[#666666] mx-auto mb-8 opacity-50" />
-          <h3 className="text-2xl font-semibold text-[#EEEEEE] mb-3 tracking-tight">No note selected</h3>
-          <p className="text-[#999999] text-base leading-relaxed">Select a note from the sidebar or create a new one to get started</p>
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <div className="text-center max-w-lg px-6">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
+            <Edit3 className="w-10 h-10 text-violet-400" />
+          </div>
+          <h3 className="text-2xl font-semibold text-foreground mb-3 tracking-tight">Selecciona una nota</h3>
+          <p className="text-muted-foreground text-base leading-relaxed">
+            Elige una nota del panel lateral o crea una nueva para comenzar a capturar tus ideas.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#111111]">
-      {/* Breadcrumbs - ClickUp style */}
+    <div className="flex-1 flex flex-col bg-background">
+      {/* Breadcrumbs */}
       {project && (
-        <div className="px-8 py-3 border-b border-[#2A2A2A] bg-[#1A1A1A]">
-          <div className="flex items-center gap-2 text-sm text-[#999999]">
-            <span className="hover:text-[#EEEEEE] cursor-pointer transition-colors font-medium">{project.name}</span>
-            <span className="text-[#666666]">/</span>
-            <span className="text-[#EEEEEE] font-semibold">{activeNote.title || 'Untitled Note'}</span>
+        <div className="px-8 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div
+              className="w-2 h-2 rounded-sm"
+              style={{ backgroundColor: project.color }}
+            />
+            <span className="hover:text-foreground cursor-pointer transition-colors font-medium">{project.name}</span>
+            <span className="opacity-40">/</span>
+            <span className="text-foreground font-semibold">{activeNote.title || 'Sin título'}</span>
           </div>
         </div>
       )}
 
-      {/* Note Header - ClickUp style: compact */}
-      <div className="px-8 py-6 border-b border-[#2A2A2A] space-y-4">
+      {/* Note Header */}
+      <div className="px-8 py-5 border-b border-border space-y-3">
         <div className="flex items-center justify-between gap-4">
           <Input
             type="text"
             value={activeNote.title}
             onChange={handleTitleChange}
-            className="text-3xl font-bold bg-transparent border-none outline-none flex-1 text-[#EEEEEE] placeholder-[#666666] tracking-tight h-auto p-0 focus-visible:ring-0"
-            placeholder="Untitled Note"
+            className="text-2xl font-bold bg-transparent border-none outline-none flex-1 text-foreground placeholder-muted-foreground tracking-tight h-auto p-0 focus-visible:ring-0"
+            placeholder="Sin título"
           />
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              onClick={handleExport}
-              variant="ghost"
-              size="sm"
-              className="h-9 px-4 text-sm font-medium text-[#EEEEEE] hover:bg-[#1A1A1A]"
-              title="Export to Markdown"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button
-              onClick={handleSave}
-              variant="ghost"
-              size="sm"
-              className="h-9 px-4 text-sm font-medium text-[#EEEEEE] hover:bg-[#1A1A1A]"
-              title="Save note"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-            <Button
-              onClick={() => setIsPreview(!isPreview)}
-              variant={isPreview ? 'default' : 'ghost'}
-              size="sm"
-              className="h-9 px-4 text-sm font-medium text-[#EEEEEE] hover:bg-[#1A1A1A] data-[state=on]:bg-[#2A2A2A]"
-              title="Toggle preview"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              Preview
-            </Button>
+          {/* Botones de acción agrupados */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Toggle Preview/Edit */}
+            <div className="flex items-center bg-muted/50 rounded-lg p-1 gap-1">
+              <Button
+                onClick={() => setIsPreview(false)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-4 text-sm font-medium rounded-md transition-all",
+                  !isPreview
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                )}
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                Editar
+              </Button>
+              <Button
+                onClick={() => setIsPreview(true)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-4 text-sm font-medium rounded-md transition-all",
+                  isPreview
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                )}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Vista previa
+              </Button>
+            </div>
+
+            {/* Separador */}
+            <div className="h-6 w-px bg-border" />
+
+            {/* Favorito, Guardar y Exportar */}
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={handleTogglePinned}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-3 text-sm hover:bg-accent transition-colors",
+                  activeNote.isPinned
+                    ? "text-amber-500 hover:text-amber-400"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title={activeNote.isPinned ? "Quitar de favoritos" : "Agregar a favoritos"}
+              >
+                <Star className={cn("w-4 h-4 mr-2", activeNote.isPinned && "fill-amber-500")} />
+                {activeNote.isPinned ? "Favorito" : "Favorito"}
+              </Button>
+              <Button
+                onClick={handleSave}
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                title="Guardar (Ctrl+S)"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Guardar
+              </Button>
+              <Button
+                onClick={handleExport}
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                title="Exportar a Markdown"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </div>
           </div>
         </div>
-        
-        {/* Metadata - ClickUp style: minimal */}
-        <div className="flex items-center gap-6 text-sm text-[#999999]">
+
+        {/* Metadata */}
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
-            <span className="font-medium">{new Date(activeNote.updatedAt).toLocaleDateString('en-US', { 
-              month: 'short', 
+            <span className="font-medium">{new Date(activeNote.updatedAt).toLocaleDateString('es-ES', {
+              month: 'short',
               day: 'numeric',
               year: 'numeric'
             })}</span>
@@ -160,37 +218,37 @@ const NoteEditor: React.FC = () => {
             <span className="font-medium">{activeNote.tags.length} {activeNote.tags.length === 1 ? 'tag' : 'tags'}</span>
           </div>
         </div>
-        
-        {/* Tags - ClickUp style: compact */}
+
+        {/* Tags */}
         {activeNote.tags.length > 0 && (
           <div className="flex items-center flex-wrap gap-2 pt-2">
             {activeNote.tags.map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
-                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md bg-[#1A1A1A] text-[#EEEEEE] border border-[#2A2A2A] hover:border-[#4A5560] transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:border-violet-500/40 transition-colors"
               >
                 <span>#{tag}</span>
                 <button
                   onClick={() => handleTagRemove(tag)}
-                  className="hover:bg-[#2A2A2A] rounded-full w-4 h-4 flex items-center justify-center transition-colors -mr-1"
-                  aria-label={`Remove tag ${tag}`}
+                  className="hover:bg-violet-500/20 rounded-full w-4 h-4 flex items-center justify-center transition-colors -mr-0.5"
+                  aria-label={`Eliminar tag ${tag}`}
                 >
-                  <X className="w-3 h-3 text-[#999999] hover:text-[#EEEEEE]" />
+                  <X className="w-3 h-3" />
                 </button>
               </Badge>
             ))}
           </div>
         )}
-        
+
         {/* Add tag input */}
         <div className="flex items-center gap-2 pt-2">
           <Input
             type="text"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}
-            placeholder="Add tag..."
-            className="w-48 h-9 text-sm border border-[#2A2A2A] bg-[#1A1A1A] text-[#EEEEEE] focus:border-[#4A5560] focus:ring-2 focus:ring-[#4A5560]/20 transition-all placeholder:text-[#666666]"
+            placeholder="Agregar tag..."
+            className="w-40 h-8 text-sm border border-border bg-muted/50 text-foreground focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all placeholder:text-muted-foreground"
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
                 handleTagAdd();
@@ -201,7 +259,7 @@ const NoteEditor: React.FC = () => {
             onClick={handleTagAdd}
             variant="ghost"
             size="sm"
-            className="h-9 px-3 text-[#EEEEEE] hover:bg-[#1A1A1A]"
+            className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-accent"
           >
             <Plus className="w-4 h-4" />
           </Button>
