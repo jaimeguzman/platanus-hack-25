@@ -298,3 +298,14 @@ playwright/.cache/
 *.gz
 *.patch
 *.diff
+
+# Flutter
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/pubspec.lock
+**/*.iml
