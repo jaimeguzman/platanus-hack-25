@@ -1,55 +1,55 @@
-name: Deploy speech_to_text Lambda
+# name: Deploy speech_to_text Lambda
 
-on:
-  push:
-    branches:
-      - main
-#    paths:
-#      - 'apis/api-sst/**'
-#      - '.github/workflows/deploy-speech-to-text.yml'
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'apis/api-sst/**'
+#       - '.github/workflows/deploy-speech-to-text.yml'
 
-permissions:
-  contents: read
+# permissions:
+#   contents: read
 
-jobs:
-  deploy:
-    name: Deploy speech_to_text Lambda
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy:
+#     name: Deploy speech_to_text Lambda
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.12'
 
-      - name: Install dependencies
-        working-directory: apis/api-sst
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -t ./package
+#       - name: Install dependencies
+#         working-directory: apis/api-sst
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install -r requirements.txt -t ./package
 
-      - name: Build deployment package
-        working-directory: apis/api-sst
-        run: |
-          cd package
-          zip -r ../speech_to_text_lambda.zip .
-          cd ..
-          zip -g speech_to_text_lambda.zip main.py
+#       - name: Build deployment package
+#         working-directory: apis/api-sst
+#         run: |
+#           cd package
+#           zip -r ../speech_to_text_lambda.zip .
+#           cd ..
+#           zip -g speech_to_text_lambda.zip main.py
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy to Lambda
-        env:
-          LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_SPEECH_TO_TEXT_NAME }}
-        run: |
-          aws lambda update-function-code \
-            --function-name "$LAMBDA_FUNCTION_NAME" \
-            --zip-file "fileb://apis/api-sst/speech_to_text_lambda.zip"
+#       - name: Deploy to Lambda
+#         env:
+#           LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_SPEECH_TO_TEXT_NAME }}
+#         run: |
+#           aws lambda update-function-code \
+#             --function-name "$LAMBDA_FUNCTION_NAME" \
+#             --zip-file "fileb://apis/api-sst/speech_to_text_lambda.zip"
