@@ -253,8 +253,6 @@ class TranscriptionService:
         # Extract text from transcription result
         # ElevenLabs returns the transcript in the 'text' field
         transcription_text = transcription_result.get("text", "")
-        
-        logger.info(transcription_text)
 
         if not transcription_text:
             raise ValueError("Transcription returned empty text")
