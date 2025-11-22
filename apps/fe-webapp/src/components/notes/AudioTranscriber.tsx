@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { usePKMStore } from '@/stores/pkmStore';
-import { Mic, Square, Upload, FileAudio, Loader2, Check } from 'lucide-react';
+import { Mic, Square, Upload, FileAudio, Loader2, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { transcribeAudioDirect } from '@/services/transcriptionService';
 
 const AudioTranscriber: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -12,6 +13,7 @@ const AudioTranscriber: React.FC = () => {
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const { addNote, setActiveNote } = usePKMStore();
 
@@ -30,10 +32,11 @@ const AudioTranscriber: React.FC = () => {
 
   const startRecording = async () => {
     try {
-      // Limpiar grabación anterior al iniciar una nueva
+      // Clear previous recording when starting a new one
       setAudioBlob(null);
       setTranscription('');
       setSaved(false);
+      setError(null);
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -55,7 +58,7 @@ const AudioTranscriber: React.FC = () => {
       setIsRecording(true);
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('No se pudo iniciar la grabación. Por favor verifica los permisos del micrófono.');
+      setError('No se pudo iniciar la grabación. Por favor verifica los permisos del micrófono.');
     }
   };
 
@@ -69,11 +72,12 @@ const AudioTranscriber: React.FC = () => {
   const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Limpiar estado anterior
+      // Clear previous state
       setTranscription('');
       setSaved(false);
+      setError(null);
       setAudioBlob(file);
-      // Resetear el input para permitir subir el mismo archivo de nuevo
+      // Reset input to allow uploading the same file again
       event.target.value = '';
     }
   };
@@ -82,22 +86,30 @@ const AudioTranscriber: React.FC = () => {
     if (!audioBlob) return;
 
     setIsTranscribing(true);
+    setError(null);
 
-    // Simulate transcription (in a real app, you'd call an AI API)
-    setTimeout(() => {
-      const mockTranscription = `Esta es una transcripción simulada de tu grabación de audio.
+    try {
+      // Call the real transcription API
+      const result = await transcribeAudioDirect(
+        audioBlob,
+        audioBlob instanceof File ? audioBlob.name : 'recording.wav'
+      );
 
-En una implementación real, esto usaría servicios de IA como:
-- OpenAI Whisper API
-- Google Cloud Speech-to-Text
-- Azure Speech Services
-- Web Speech API (nativo del navegador)
+      // Extract the transcription text
+      const transcriptionText = result.transcription.text || '';
+      
+      if (!transcriptionText.trim()) {
+        throw new Error('La transcripción está vacía. Por favor intenta de nuevo.');
+      }
 
-La transcripción capturaría tus pensamientos, ideas y notas que luego puedes organizar y conectar con otras notas en tu base de conocimiento.`;
-
-      setTranscription(mockTranscription);
+      setTranscription(transcriptionText);
+    } catch (err) {
+      console.error('Error transcribing audio:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error al transcribir el audio';
+      setError(errorMessage);
+    } finally {
       setIsTranscribing(false);
-    }, 2000);
+    }
   };
 
   const saveAsNote = () => {
@@ -122,6 +134,17 @@ La transcripción capturaría tus pensamientos, ideas y notas que luego puedes o
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">Error</p>
+            <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Recording Controls */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         {!isRecording ? (
@@ -217,7 +240,7 @@ La transcripción capturaría tus pensamientos, ideas y notas que luego puedes o
       {!audioBlob && !transcription && (
         <div className="bg-muted/30 rounded-lg p-4 border border-border">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            <span className="font-medium text-foreground">Instrucciones:</span> Haz clic en "Iniciar Grabación" para grabar tu voz, o sube un archivo de audio existente. Edita la transcripción y guárdala como nota para añadirla a tu base de conocimiento.
+            <span className="font-medium text-foreground">Instrucciones:</span> Haz clic en "Iniciar Grabación" para grabar tu voz, o sube un archivo de audio existente. La transcripción se realizará usando IA y luego podrás editarla y guardarla como nota en tu base de conocimiento.
           </p>
         </div>
       )}

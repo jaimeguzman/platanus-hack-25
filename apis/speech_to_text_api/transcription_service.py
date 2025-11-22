@@ -246,8 +246,8 @@ class TranscriptionService:
         transcription_result = await self.transcribe_from_base64_direct(
             audio_base64=audio_base64,
             filename=filename,
-            language_code=language_code,
-            model_id=model_id,
+            language_code=language_code or 'es',
+            model_id=model_id or 'scribe_v1',
         )
         
         # Extract text from transcription result
@@ -256,6 +256,8 @@ class TranscriptionService:
 
         if not transcription_text:
             raise ValueError("Transcription returned empty text")
+
+        logger.info(f"Transcription text: {transcription_text}")
         
         # Store in RAG memory via HTTP
         memory = await self._add_memory_via_http(
