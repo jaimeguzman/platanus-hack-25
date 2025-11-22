@@ -114,13 +114,13 @@ export async function POST(req: Request) {
       if (wantStream) {
         return streamAnswerWithRag({
           text,
-          category: body.category || undefined,
+          category: body.category || 'chat_note',
           needsCitation: false,
         });
       } else {
         const { results, answer } = await answerWithRag({
           text,
-          category: body.category || undefined,
+          category: body.category || 'chat_note',
         });
         return NextResponse.json({
           action: 'answered',
@@ -197,13 +197,13 @@ export async function POST(req: Request) {
       if (wantStream) {
         return streamAnswerWithRag({
           text,
-          category: body.category ?? undefined,
+          category: body.category ?? 'chat_note',
           needsCitation: call.args?.needs_citation ?? false,
         });
       } else {
         const { results, answer } = await answerWithRag({
           text,
-          category: body.category ?? undefined,
+          category: body.category ?? 'chat_note',
           needsCitation: call.args?.needs_citation ?? false,
         });
         return NextResponse.json({
@@ -261,10 +261,7 @@ function streamAnswerWithRag(input: {
     }>;
     const top = search.slice(0, 3);
     const context = top
-      .map(
-        (r) =>
-          `- (sim=${r.similarity_score.toFixed(2)}) ${r.memory.text.slice(0, 600)}`,
-      )
+      .map((r) => `- [id ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
       .join('\n');
 
     // Stream the answer
@@ -346,10 +343,7 @@ async function answerWithRag(input: {
 
   const top = search.slice(0, 3);
   const context = top
-    .map(
-      (r) =>
-        `- (sim=${r.similarity_score.toFixed(2)}) ${r.memory.text.slice(0, 600)}`,
-    )
+    .map((r) => `- [id ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
     .join('\n');
 
   // 2) Answer
