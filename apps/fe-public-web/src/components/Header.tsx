@@ -9,7 +9,7 @@ export function Header() {
   const navItems = [
     { label: 'Características', href: '#features' },
     { label: 'Cómo funciona', href: '#how-it-works' },
-    { label: 'Demo', href: '#demo' },
+    { label: 'Chat', href: '#chat' },
     { label: 'Contacto', href: '#contact' },
   ];
 
