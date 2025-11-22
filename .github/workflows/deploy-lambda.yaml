@@ -8,9 +8,6 @@ on:
       - 'services/rag_memory/**'
       - '.github/workflows/deploy.yaml'
 
-  permissions:
-    contents: read 
-    
 jobs:
   deploy:
     runs-on: ubuntu-latest
