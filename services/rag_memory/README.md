@@ -1,19 +1,22 @@
 # RAG Memory Service - Complete Documentation
 
-A production-ready RAG (Retrieval-Augmented Generation) memory system with graph-based relationships and semantic search capabilities.
+A production-ready RAG (Retrieval-Augmented Generation) memory system with **chunk-based embeddings**, graph-based relationships, and semantic search capabilities.
+
+> **🆕 Version 2.0**: Now with chunk-based embeddings for improved semantic search! See [Chunking System](#chunking-system) for details.
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [Features](#features)
-3. [Architecture](#architecture)
-4. [Installation](#installation)
-5. [Quick Start](#quick-start)
-6. [Usage Examples](#usage-examples)
-7. [API Reference](#api-reference)
-8. [Configuration](#configuration)
+2. [Chunking System](#chunking-system) 🆕
+3. [Features](#features)
+4. [Architecture](#architecture)
+5. [Installation](#installation)
+6. [Quick Start](#quick-start)
+7. [Usage Examples](#usage-examples)
+8. [API Reference](#api-reference)
+9. [Configuration](#configuration)
 
 ---
 
@@ -21,6 +24,7 @@ A production-ready RAG (Retrieval-Augmented Generation) memory system with graph
 
 The RAG Memory Service is a sophisticated system for storing, retrieving, and analyzing textual memories using vector embeddings and graph relationships. It combines:
 
+- **Chunk-Based Embeddings**: 🆕 Text is split into overlapping chunks for better semantic search
 - **Vector Search**: Fast semantic search using OpenAI embeddings and pgvector
 - **Graph Relationships**: Automatic similarity-based connections between memories
 - **Advanced Analytics**: Clustering, path finding, and graph statistics
@@ -28,6 +32,7 @@ The RAG Memory Service is a sophisticated system for storing, retrieving, and an
 
 ### Key Capabilities
 
+- ✅ 🆕 Automatic text chunking with configurable size and overlap
 - ✅ Semantic search with configurable similarity thresholds
 - ✅ Automatic relationship discovery between similar memories
 - ✅ Category-based organization and filtering
@@ -36,6 +41,71 @@ The RAG Memory Service is a sophisticated system for storing, retrieving, and an
 - ✅ Embedding cache to reduce API costs
 - ✅ Full CRUD operations
 - ✅ Comprehensive error handling and logging
+
+---
+
+## Chunking System
+
+### What is Chunking?
+
+Instead of creating a single embedding for an entire document, the system now splits each memory into smaller, overlapping **chunks** that are individually vectorized. This provides several benefits:
+
+- **Better Semantic Search**: Smaller chunks capture more specific semantic meanings
+- **Scalability**: Can handle very long documents without hitting embedding limits
+- **Granular Similarity**: Can find similarities between specific sections of documents
+- **Reduced Noise**: Irrelevant parts don't dilute the embedding
+
+### How It Works
+
+```
+Original Text (1000 words)
+         ↓
+    Text Chunker
+         ↓
+┌────────┴────────┐
+│  Chunk 1 (400w) │ → Embedding 1
+│  Chunk 2 (400w) │ → Embedding 2  (80 words overlap with Chunk 1)
+│  Chunk 3 (400w) │ → Embedding 3  (80 words overlap with Chunk 2)
+└─────────────────┘
+```
+
+### Configuration
+
+Default chunking parameters (configurable in `config.py`):
+
+```python
+chunk_size_words: int = 400      # Number of words per chunk
+chunk_overlap_words: int = 80    # Overlapping words between chunks
+```
+
+### Similarity Calculation
+
+When comparing memories:
+1. Each chunk of memory A is compared with chunks of memory B
+2. The **maximum similarity** across all chunk pairs is used
+3. This ensures partial matches are detected
+
+### Example
+
+```python
+# Add a long document - automatically chunked
+memory = service.add_memory(
+    text="Your very long document here..." * 100,
+    category="documentation"
+)
+
+# Get chunks for inspection
+chunks = service.get_memory_chunks(memory.id)
+print(f"Created {len(chunks)} chunks")
+
+# Search works the same - query is also chunked automatically
+results = service.search_similar_by_text(
+    query_text="Your search query",
+    limit=5
+)
+```
+
+For more details, see [CHUNKING_GUIDE.md](CHUNKING_GUIDE.md).
 
 ---
 
@@ -75,18 +145,24 @@ The RAG Memory Service is a sophisticated system for storing, retrieving, and an
 ┌─────────────────────────────────────────────────────────────┐
 │                    RagMemoryService                         │
 │  - Add/Update/Delete memories                               │
-│  - Semantic search                                          │
+│  - Semantic search (chunk-based)                            │
 │  - Graph operations                                         │
 └─────────────────┬───────────────────────────────────────────┘
                   │
-        ┌─────────┴─────────┐
-        │                   │
-┌───────▼────────┐  ┌──────▼──────────┐
-│ EmbeddingGen   │  │  MemoryGraph    │
-│ - OpenAI API   │  │  - NetworkX     │
-│ - Caching      │  │  - Traversal    │
-│ - Batch ops    │  │  - Analytics    │
-└───────┬────────┘  └──────┬──────────┘
+        ┌─────────┴─────────┬─────────────┐
+        │                   │             │
+┌───────▼────────┐  ┌──────▼──────────┐ │
+│ EmbeddingGen   │  │  MemoryGraph    │ │
+│ - OpenAI API   │  │  - NetworkX     │ │
+│ - Caching      │  │  - Traversal    │ │
+│ - Batch ops    │  │  - Analytics    │ │
+└───────┬────────┘  └──────┬──────────┘ │
+        │                   │            │
+        │          ┌────────▼────────┐   │
+        │          │  TextChunker    │◄──┘
+        │          │  - Split text   │
+        │          │  - Overlap      │
+        │          └────────┬────────┘
         │                   │
         └─────────┬─────────┘
                   │
@@ -94,9 +170,29 @@ The RAG Memory Service is a sophisticated system for storing, retrieving, and an
         │   PostgreSQL      │
         │   + pgvector      │
         │   - Memories      │
+        │   - Chunks 🆕     │
         │   - Edges         │
         └───────────────────┘
 ```
+
+### Database Schema
+
+**Memory Table**: Stores full text without embeddings
+- `id`: Primary key
+- `text`: Full text content
+- `category`, `source`: Metadata
+- `created_at`, `updated_at`: Timestamps
+
+**Memory Chunk Table** 🆕: Stores text chunks with embeddings
+- `id`: Primary key
+- `memory_id`: Foreign key to memory
+- `chunk_text`: Chunk content
+- `chunk_index`: Order within memory
+- `embedding`: Vector(1536) for semantic search
+
+**Memory Edge Table**: Stores similarity relationships
+- `source_id`, `target_id`: Composite primary key
+- `weight`: Similarity score (0.0 to 1.0)
 
 ### Components
 

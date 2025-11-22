@@ -6,14 +6,13 @@ from .database import Base
 
 class Memory(Base):
     """
-    Represents a memory with its text content and vector embedding.
-    Supports semantic search via pgvector.
+    Represents a memory with its full text content.
+    Text is split into chunks for vector search.
     """
     __tablename__ = "memory"
 
     id = Column(Integer, primary_key=True, index=True)
-    text = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))  # text-embedding-3-small dimension
+    text = Column(Text, nullable=False)  # Full text content
     
     # Optional metadata fields
     category = Column(String(100), nullable=True, index=True)
@@ -26,6 +25,37 @@ class Memory(Base):
     def __repr__(self):
         text_preview = self.text[:50] + "..." if len(self.text) > 50 else self.text
         return f"<Memory(id={self.id}, text='{text_preview}')>"
+
+
+class MemoryChunk(Base):
+    """
+    Represents a chunk of a memory with its vector embedding.
+    Supports semantic search via pgvector.
+    """
+    __tablename__ = "memory_chunk"
+
+    id = Column(Integer, primary_key=True, index=True)
+    memory_id = Column(
+        Integer,
+        ForeignKey("memory.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_text = Column(Text, nullable=False)
+    chunk_index = Column(Integer, nullable=False)  # Order within memory (0-based)
+    embedding = Column(Vector(1536))  # text-embedding-3-small dimension
+    
+    # Timestamp
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Composite index for efficient queries
+    __table_args__ = (
+        Index('idx_memory_chunk_index', memory_id, chunk_index),
+    )
+    
+    def __repr__(self):
+        text_preview = self.chunk_text[:50] + "..." if len(self.chunk_text) > 50 else self.chunk_text
+        return f"<MemoryChunk(id={self.id}, memory_id={self.memory_id}, index={self.chunk_index}, text='{text_preview}')>"
 
 
 class MemoryEdge(Base):

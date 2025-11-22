@@ -8,30 +8,34 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import SessionLocal, Base, engine
-from .models import Memory, MemoryEdge
+from .models import Memory, MemoryChunk, MemoryEdge
 from .embeddings import EmbeddingGenerator
 from .graph_store import MemoryGraphStore
+from .chunking import TextChunker
+from .config import config
 
 logger = logging.getLogger(__name__)
 
 
 class RagMemoryService:
     """
-    Core RAG memory graph service.
+    Core RAG memory graph service with chunk-based embeddings.
     
     Provides functionality for:
-    - Adding and retrieving memories
-    - Semantic search using vector embeddings
-    - Graph-based similarity relationships
+    - Adding and retrieving memories (full text stored, chunks vectorized)
+    - Semantic search using vector embeddings on chunks
+    - Graph-based similarity relationships between memories
     - Memory clustering and traversal
     """
 
     def __init__(
         self,
         auto_create_schema: bool = True,
-        similarity_threshold: float = 0.7,
-        max_similar_connections: int = 5,
+        similarity_threshold: float = config.similarity_threshold,
+        max_similar_connections: int = config.max_similar_connections,
         load_graph: bool = True,
+        chunk_size_words: Optional[int] = None,
+        chunk_overlap_words: Optional[int] = None,
     ):
         """
         Initialize the RAG memory service.
@@ -41,11 +45,19 @@ class RagMemoryService:
             similarity_threshold: Minimum similarity score to create an edge (0.0 to 1.0)
             max_similar_connections: Maximum number of similar memories to connect
             load_graph: Whether to load the graph from database on initialization
+            chunk_size_words: Number of words per chunk (defaults to config value)
+            chunk_overlap_words: Number of overlapping words (defaults to config value)
         """
         self.embedding_generator = EmbeddingGenerator()
         self.graph_store = MemoryGraphStore()
         self.similarity_threshold = similarity_threshold
         self.max_similar_connections = max_similar_connections
+        
+        # Initialize text chunker
+        self.chunker = TextChunker(
+            chunk_size_words=chunk_size_words or config.chunk_size_words,
+            overlap_words=chunk_overlap_words or config.chunk_overlap_words,
+        )
 
         if auto_create_schema:
             try:
@@ -96,9 +108,10 @@ class RagMemoryService:
     ) -> Memory:
         """
         Add a new memory to the system.
+        Text is automatically split into chunks and vectorized.
         
         Args:
-            text: The text content of the memory
+            text: The full text content of the memory
             category: Optional category/tag for the memory
             source: Optional source identifier
             
@@ -114,17 +127,23 @@ class RagMemoryService:
         
         text = text.strip()
         
+        # Split text into chunks
+        chunk_texts = self.chunker.split_text(text)
+        if not chunk_texts:
+            raise ValueError("Failed to create chunks from text")
+        
+        # Generate embeddings for all chunks
         try:
-            embedding = self.embedding_generator.generate_embedding(text)
+            chunk_embeddings = self.embedding_generator.generate_embeddings_batch(chunk_texts)
         except Exception as e:
-            logger.error(f"Failed to generate embedding: {e}")
+            logger.error(f"Failed to generate chunk embeddings: {e}")
             raise
 
         session = self._get_session()
         try:
+            # Create memory with full text (no embedding)
             memory = Memory(
                 text=text,
-                embedding=embedding,
                 category=category,
                 source=source,
             )
@@ -132,43 +151,51 @@ class RagMemoryService:
             session.commit()
             session.refresh(memory)
             
-            logger.info(f"Created memory {memory.id}")
+            logger.info(f"Created memory {memory.id} with {len(chunk_texts)} chunks")
 
+            # Create chunks with embeddings
+            chunks = []
+            for idx, (chunk_text, chunk_embedding) in enumerate(zip(chunk_texts, chunk_embeddings)):
+                chunk = MemoryChunk(
+                    memory_id=memory.id,
+                    chunk_text=chunk_text,
+                    chunk_index=idx,
+                    embedding=chunk_embedding,
+                )
+                session.add(chunk)
+                chunks.append(chunk)
+            
+            session.commit()
+            
             # Add to graph
             self.graph_store.add_memory_node(memory.id)
 
-            # Find and connect similar memories
-            similar_memories = self._get_similar_memories_by_embedding(
+            # Find and connect similar memories based on chunk similarity
+            similar_memories = self._find_similar_memories_by_chunks(
                 session=session,
-                embedding=embedding,
-                limit=self.max_similar_connections,
-                exclude_id=memory.id,
+                chunk_embeddings=chunk_embeddings,
+                exclude_memory_id=memory.id,
             )
 
             edges_created = 0
-            for sim in similar_memories:
-                similarity_score = self._calculate_cosine_similarity(
-                    embedding_a=embedding,
-                    embedding_b=sim.embedding,
-                )
-
+            for sim_memory_id, similarity_score in similar_memories:
                 # Only create edge if similarity exceeds threshold
                 if similarity_score < self.similarity_threshold:
                     continue
 
                 # Check if edges already exist
-                existing_forward = session.get(MemoryEdge, (memory.id, sim.id))
-                existing_backward = session.get(MemoryEdge, (sim.id, memory.id))
+                existing_forward = session.get(MemoryEdge, (memory.id, sim_memory_id))
+                existing_backward = session.get(MemoryEdge, (sim_memory_id, memory.id))
                 
                 if existing_forward:
                     # Update existing edge weight
                     existing_forward.weight = similarity_score
-                    logger.debug(f"Updated edge {memory.id} -> {sim.id}")
+                    logger.debug(f"Updated edge {memory.id} -> {sim_memory_id}")
                 else:
                     # Create new forward edge
                     edge_forward = MemoryEdge(
                         source_id=memory.id,
-                        target_id=sim.id,
+                        target_id=sim_memory_id,
                         weight=similarity_score,
                     )
                     session.add(edge_forward)
@@ -176,11 +203,11 @@ class RagMemoryService:
                 if existing_backward:
                     # Update existing edge weight
                     existing_backward.weight = similarity_score
-                    logger.debug(f"Updated edge {sim.id} -> {memory.id}")
+                    logger.debug(f"Updated edge {sim_memory_id} -> {memory.id}")
                 else:
                     # Create new backward edge
                     edge_backward = MemoryEdge(
-                        source_id=sim.id,
+                        source_id=sim_memory_id,
                         target_id=memory.id,
                         weight=similarity_score,
                     )
@@ -189,7 +216,7 @@ class RagMemoryService:
                 # Add/update in-memory graph
                 self.graph_store.add_similarity_edge(
                     memory.id,
-                    sim.id,
+                    sim_memory_id,
                     similarity_score,
                 )
                 
@@ -203,7 +230,6 @@ class RagMemoryService:
             # Ensure all attributes are loaded before closing session
             _ = memory.id
             _ = memory.text
-            _ = memory.embedding
             _ = memory.created_at
             _ = memory.category
             _ = memory.source
@@ -225,9 +251,10 @@ class RagMemoryService:
     ) -> List[Memory]:
         """
         Add multiple memories efficiently in a batch.
+        Each memory is chunked and vectorized.
         
         Args:
-            texts: List of text contents
+            texts: List of full text contents
             categories: Optional list of categories (must match length of texts)
             sources: Optional list of sources (must match length of texts)
             
@@ -242,9 +269,25 @@ class RagMemoryService:
         if sources and len(sources) != len(texts):
             raise ValueError("Sources list must match texts length")
         
-        # Generate all embeddings in batch
+        # Prepare all chunks for all texts
+        all_chunks_data = []  # List of (text_idx, chunk_idx, chunk_text)
+        all_chunk_texts = []  # Flat list of chunk texts for batch embedding
+        
+        for text_idx, text in enumerate(texts):
+            text = text.strip()
+            chunk_texts = self.chunker.split_text(text)
+            
+            if not chunk_texts:
+                logger.warning(f"Text {text_idx} produced no chunks, skipping")
+                continue
+            
+            for chunk_idx, chunk_text in enumerate(chunk_texts):
+                all_chunks_data.append((text_idx, chunk_idx, chunk_text))
+                all_chunk_texts.append(chunk_text)
+        
+        # Generate all embeddings in one batch
         try:
-            embeddings = self.embedding_generator.generate_embeddings_batch(texts)
+            all_embeddings = self.embedding_generator.generate_embeddings_batch(all_chunk_texts)
         except Exception as e:
             logger.error(f"Failed to generate batch embeddings: {e}")
             raise
@@ -254,10 +297,9 @@ class RagMemoryService:
         
         try:
             # Create all memory objects
-            for i, (text, embedding) in enumerate(zip(texts, embeddings)):
+            for i, text in enumerate(texts):
                 memory = Memory(
                     text=text.strip(),
-                    embedding=embedding,
                     category=categories[i] if categories else None,
                     source=sources[i] if sources else None,
                 )
@@ -273,30 +315,54 @@ class RagMemoryService:
             
             logger.info(f"Created {len(memories)} memories in batch")
             
+            # Create chunks with embeddings
+            embedding_idx = 0
+            memory_chunk_embeddings = {}  # memory_id -> list of embeddings
+            
+            for text_idx, chunk_idx, chunk_text in all_chunks_data:
+                memory = memories[text_idx]
+                embedding = all_embeddings[embedding_idx]
+                embedding_idx += 1
+                
+                chunk = MemoryChunk(
+                    memory_id=memory.id,
+                    chunk_text=chunk_text,
+                    chunk_index=chunk_idx,
+                    embedding=embedding,
+                )
+                session.add(chunk)
+                
+                # Track embeddings per memory for similarity calculation
+                if memory.id not in memory_chunk_embeddings:
+                    memory_chunk_embeddings[memory.id] = []
+                memory_chunk_embeddings[memory.id].append(embedding)
+            
+            session.commit()
+            
+            logger.info(f"Created {len(all_chunks_data)} chunks in batch")
+            
             # Connect similar memories
             # Track edges created in this batch to avoid duplicates
             edges_in_batch = set()
             
             for memory in memories:
-                similar_memories = self._get_similar_memories_by_embedding(
+                chunk_embeddings = memory_chunk_embeddings.get(memory.id, [])
+                if not chunk_embeddings:
+                    continue
+                
+                similar_memories = self._find_similar_memories_by_chunks(
                     session=session,
-                    embedding=memory.embedding,
-                    limit=self.max_similar_connections,
-                    exclude_id=memory.id,
+                    chunk_embeddings=chunk_embeddings,
+                    exclude_memory_id=memory.id,
                 )
                 
-                for sim in similar_memories:
-                    similarity_score = self._calculate_cosine_similarity(
-                        embedding_a=memory.embedding,
-                        embedding_b=sim.embedding,
-                    )
-                    
+                for sim_memory_id, similarity_score in similar_memories:
                     if similarity_score < self.similarity_threshold:
                         continue
                     
                     # Create edge keys for tracking
-                    edge_forward_key = (memory.id, sim.id)
-                    edge_backward_key = (sim.id, memory.id)
+                    edge_forward_key = (memory.id, sim_memory_id)
+                    edge_backward_key = (sim_memory_id, memory.id)
                     
                     # Check if edges already exist in DB
                     existing_forward = session.get(MemoryEdge, edge_forward_key)
@@ -311,7 +377,7 @@ class RagMemoryService:
                         # Create new forward edge only if not already created in this batch
                         edge_forward = MemoryEdge(
                             source_id=memory.id,
-                            target_id=sim.id,
+                            target_id=sim_memory_id,
                             weight=similarity_score,
                         )
                         session.add(edge_forward)
@@ -325,7 +391,7 @@ class RagMemoryService:
                     elif edge_backward_key not in edges_in_batch:
                         # Create new backward edge only if not already created in this batch
                         edge_backward = MemoryEdge(
-                            source_id=sim.id,
+                            source_id=sim_memory_id,
                             target_id=memory.id,
                             weight=similarity_score,
                         )
@@ -335,7 +401,7 @@ class RagMemoryService:
                     # Add/update in-memory graph
                     self.graph_store.add_similarity_edge(
                         memory.id,
-                        sim.id,
+                        sim_memory_id,
                         similarity_score,
                     )
             
@@ -372,7 +438,6 @@ class RagMemoryService:
                 # Ensure all attributes are loaded before closing session
                 _ = memory.id
                 _ = memory.text
-                _ = memory.embedding
                 _ = memory.created_at
                 _ = memory.category
                 _ = memory.source
@@ -380,6 +445,39 @@ class RagMemoryService:
             return memory
         except SQLAlchemyError as e:
             logger.error(f"Database error retrieving memory {memory_id}: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_memory_chunks(self, memory_id: int) -> List[MemoryChunk]:
+        """
+        Retrieve all chunks for a memory.
+        
+        Args:
+            memory_id: The ID of the memory
+            
+        Returns:
+            List of MemoryChunk objects, ordered by chunk_index
+        """
+        session = self._get_session()
+        try:
+            stmt = (
+                select(MemoryChunk)
+                .where(MemoryChunk.memory_id == memory_id)
+                .order_by(MemoryChunk.chunk_index)
+            )
+            chunks = session.execute(stmt).scalars().all()
+            
+            # Expunge all chunks
+            for chunk in chunks:
+                _ = chunk.id
+                _ = chunk.chunk_text
+                _ = chunk.chunk_index
+                session.expunge(chunk)
+            
+            return chunks
+        except SQLAlchemyError as e:
+            logger.error(f"Database error retrieving chunks for memory {memory_id}: {e}")
             raise
         finally:
             session.close()
@@ -425,11 +523,11 @@ class RagMemoryService:
     ) -> Optional[Memory]:
         """
         Update a memory's content and/or metadata.
-        If text is updated, embeddings and edges are recalculated.
+        If text is updated, chunks, embeddings and edges are recalculated.
         
         Args:
             memory_id: The ID of the memory to update
-            text: New text content (triggers embedding recalculation)
+            text: New full text content (triggers chunk and embedding recalculation)
             category: New category
             source: New source
             
@@ -449,7 +547,7 @@ class RagMemoryService:
             if source is not None:
                 memory.source = source
             
-            # If text changed, recalculate embedding and edges
+            # If text changed, recalculate chunks, embeddings and edges
             if text is not None and text.strip() != memory.text:
                 text = text.strip()
                 if not text:
@@ -457,13 +555,32 @@ class RagMemoryService:
                 
                 memory.text = text
                 
-                # Generate new embedding
+                # Delete old chunks (cascade will handle this, but explicit is clearer)
+                session.execute(
+                    delete(MemoryChunk).where(MemoryChunk.memory_id == memory_id)
+                )
+                
+                # Split text into chunks
+                chunk_texts = self.chunker.split_text(text)
+                if not chunk_texts:
+                    raise ValueError("Failed to create chunks from text")
+                
+                # Generate new embeddings for chunks
                 try:
-                    embedding = self.embedding_generator.generate_embedding(text)
-                    memory.embedding = embedding
+                    chunk_embeddings = self.embedding_generator.generate_embeddings_batch(chunk_texts)
                 except Exception as e:
-                    logger.error(f"Failed to generate embedding for update: {e}")
+                    logger.error(f"Failed to generate chunk embeddings for update: {e}")
                     raise
+                
+                # Create new chunks
+                for idx, (chunk_text, chunk_embedding) in enumerate(zip(chunk_texts, chunk_embeddings)):
+                    chunk = MemoryChunk(
+                        memory_id=memory_id,
+                        chunk_text=chunk_text,
+                        chunk_index=idx,
+                        embedding=chunk_embedding,
+                    )
+                    session.add(chunk)
                 
                 # Delete old edges
                 session.execute(
@@ -472,26 +589,20 @@ class RagMemoryService:
                     )
                 )
                 
-                # Recreate edges
-                similar_memories = self._get_similar_memories_by_embedding(
+                # Recreate edges based on new chunks
+                similar_memories = self._find_similar_memories_by_chunks(
                     session=session,
-                    embedding=embedding,
-                    limit=self.max_similar_connections,
-                    exclude_id=memory_id,
+                    chunk_embeddings=chunk_embeddings,
+                    exclude_memory_id=memory_id,
                 )
                 
-                for sim in similar_memories:
-                    similarity_score = self._calculate_cosine_similarity(
-                        embedding_a=embedding,
-                        embedding_b=sim.embedding,
-                    )
-                    
+                for sim_memory_id, similarity_score in similar_memories:
                     if similarity_score < self.similarity_threshold:
                         continue
                     
                     # Check if edges already exist
-                    existing_forward = session.get(MemoryEdge, (memory_id, sim.id))
-                    existing_backward = session.get(MemoryEdge, (sim.id, memory_id))
+                    existing_forward = session.get(MemoryEdge, (memory_id, sim_memory_id))
+                    existing_backward = session.get(MemoryEdge, (sim_memory_id, memory_id))
                     
                     if existing_forward:
                         # Update existing edge weight
@@ -500,7 +611,7 @@ class RagMemoryService:
                         # Create new forward edge
                         edge_forward = MemoryEdge(
                             source_id=memory_id,
-                            target_id=sim.id,
+                            target_id=sim_memory_id,
                             weight=similarity_score,
                         )
                         session.add(edge_forward)
@@ -511,7 +622,7 @@ class RagMemoryService:
                     else:
                         # Create new backward edge
                         edge_backward = MemoryEdge(
-                            source_id=sim.id,
+                            source_id=sim_memory_id,
                             target_id=memory_id,
                             weight=similarity_score,
                         )
@@ -613,56 +724,112 @@ class RagMemoryService:
 
     # -------- Similarity search --------
 
-    def _get_similar_memories_by_embedding(
+    def _find_similar_memories_by_chunks(
+        self,
+        session: Session,
+        chunk_embeddings: List[List[float]],
+        exclude_memory_id: Optional[int] = None,
+    ) -> List[Tuple[int, float]]:
+        """
+        Find similar memories by comparing chunk embeddings.
+        Returns aggregated similarity scores per memory.
+        
+        Args:
+            session: Database session
+            chunk_embeddings: List of query chunk embeddings
+            exclude_memory_id: Memory ID to exclude from results
+            
+        Returns:
+            List of (memory_id, similarity_score) tuples, sorted by score descending
+        """
+        # For each query chunk, find similar chunks
+        memory_similarities: Dict[int, List[float]] = {}
+        
+        # We need to search more chunks to ensure we find enough unique memories
+        # Multiply by a larger factor to account for:
+        # 1. Multiple chunks per memory
+        # 2. The need to find max_similar_connections unique memories
+        chunk_search_limit = self.max_similar_connections * 10
+        
+        for query_embedding in chunk_embeddings:
+            # Find similar chunks using cosine distance
+            similar_chunks = self._get_similar_chunks_by_embedding(
+                session=session,
+                embedding=query_embedding,
+                limit=chunk_search_limit,
+            )
+            
+            # Group by memory and collect similarities
+            for chunk in similar_chunks:
+                if exclude_memory_id and chunk.memory_id == exclude_memory_id:
+                    continue
+                
+                similarity = self._calculate_cosine_similarity(
+                    query_embedding,
+                    chunk.embedding,
+                )
+                
+                if chunk.memory_id not in memory_similarities:
+                    memory_similarities[chunk.memory_id] = []
+                memory_similarities[chunk.memory_id].append(similarity)
+        
+        # Aggregate similarities per memory (use max similarity)
+        memory_scores = []
+        for memory_id, similarities in memory_similarities.items():
+            # Use max similarity as the representative score
+            max_similarity = max(similarities)
+            memory_scores.append((memory_id, max_similarity))
+        
+        # Sort by similarity descending
+        memory_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Return top N
+        return memory_scores[:self.max_similar_connections]
+
+    def _get_similar_chunks_by_embedding(
         self,
         session: Session,
         embedding: List[float],
-        limit: int = 5,
-        exclude_id: Optional[int] = None,
+        limit: int = 10,
         category: Optional[str] = None,
         min_similarity: Optional[float] = None,
-    ) -> List[Memory]:
+    ) -> List[MemoryChunk]:
         """
-        Find similar memories using cosine distance.
+        Find similar chunks using cosine distance.
         
         Args:
             session: Database session
             embedding: Query embedding vector
             limit: Maximum number of results
-            exclude_id: Memory ID to exclude from results
-            category: Filter by category
+            category: Filter by memory category
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
             
         Returns:
-            List of similar Memory objects
+            List of similar MemoryChunk objects
         """
-        # Use cosine distance operator for better semantic search
-        distance_expr = Memory.embedding.op("<=>")(embedding)
+        # Use cosine distance operator for semantic search
+        distance_expr = MemoryChunk.embedding.op("<=>")(embedding)
 
-        stmt = select(Memory).order_by(distance_expr)
+        stmt = select(MemoryChunk).order_by(distance_expr)
         
+        # Join with Memory if category filter is needed
         if category:
-            stmt = stmt.where(Memory.category == category)
+            stmt = stmt.join(Memory).where(Memory.category == category)
         
-        # Request extra to account for exclusion
-        stmt = stmt.limit(limit + (1 if exclude_id is not None else 0))
+        stmt = stmt.limit(limit)
 
         results = session.execute(stmt).scalars().all()
-
-        # Filter out excluded ID
-        if exclude_id is not None:
-            results = [m for m in results if m.id != exclude_id]
 
         # Apply similarity threshold if specified
         if min_similarity is not None:
             filtered_results = []
-            for memory in results:
-                similarity = self._calculate_cosine_similarity(embedding, memory.embedding)
+            for chunk in results:
+                similarity = self._calculate_cosine_similarity(embedding, chunk.embedding)
                 if similarity >= min_similarity:
-                    filtered_results.append(memory)
+                    filtered_results.append(chunk)
             results = filtered_results
 
-        return results[:limit]
+        return results
 
     def search_similar_by_text(
         self,
@@ -673,6 +840,7 @@ class RagMemoryService:
     ) -> List[Tuple[Memory, float]]:
         """
         Search for memories similar to the query text.
+        Query is chunked and compared against memory chunks.
         
         Args:
             query_text: The text to search for
@@ -686,38 +854,67 @@ class RagMemoryService:
         if not query_text or not query_text.strip():
             raise ValueError("Query text cannot be empty")
         
+        query_text = query_text.strip()
+        
+        # Split query into chunks
+        query_chunks = self.chunker.split_text(query_text)
+        if not query_chunks:
+            query_chunks = [query_text]  # Fallback to full text
+        
+        # Generate embeddings for query chunks
         try:
-            embedding = self.embedding_generator.generate_embedding(query_text.strip())
+            query_embeddings = self.embedding_generator.generate_embeddings_batch(query_chunks)
         except Exception as e:
-            logger.error(f"Failed to generate query embedding: {e}")
+            logger.error(f"Failed to generate query embeddings: {e}")
             raise
 
         session = self._get_session()
         try:
-            memories = self._get_similar_memories_by_embedding(
-                session=session,
-                embedding=embedding,
-                limit=limit,
-                category=category,
-                min_similarity=min_similarity,
-            )
+            # Find similar chunks and aggregate by memory
+            memory_similarities: Dict[int, List[float]] = {}
             
-            # Calculate similarity scores
-            results = []
-            for memory in memories:
-                similarity = self._calculate_cosine_similarity(embedding, memory.embedding)
-                results.append((memory, similarity))
+            for query_embedding in query_embeddings:
+                similar_chunks = self._get_similar_chunks_by_embedding(
+                    session=session,
+                    embedding=query_embedding,
+                    limit=limit * 3,  # Get more chunks to ensure we have enough memories
+                    category=category,
+                    min_similarity=min_similarity,
+                )
                 
-                # Ensure all attributes are loaded before closing session
-                _ = memory.id
-                _ = memory.text
-                _ = memory.embedding
-                _ = memory.created_at
-                _ = memory.category
-                session.expunge(memory)
+                for chunk in similar_chunks:
+                    similarity = self._calculate_cosine_similarity(
+                        query_embedding,
+                        chunk.embedding,
+                    )
+                    
+                    if chunk.memory_id not in memory_similarities:
+                        memory_similarities[chunk.memory_id] = []
+                    memory_similarities[chunk.memory_id].append(similarity)
             
-            # Sort by similarity descending
-            results.sort(key=lambda x: x[1], reverse=True)
+            # Aggregate similarities per memory (use max similarity)
+            memory_scores = []
+            for memory_id, similarities in memory_similarities.items():
+                max_similarity = max(similarities)
+                memory_scores.append((memory_id, max_similarity))
+            
+            # Sort by similarity descending and limit
+            memory_scores.sort(key=lambda x: x[1], reverse=True)
+            memory_scores = memory_scores[:limit]
+            
+            # Fetch memory objects
+            results = []
+            for memory_id, similarity in memory_scores:
+                memory = session.get(Memory, memory_id)
+                if memory:
+                    # Ensure all attributes are loaded before closing session
+                    _ = memory.id
+                    _ = memory.text
+                    _ = memory.created_at
+                    _ = memory.category
+                    _ = memory.source
+                    session.expunge(memory)
+                    results.append((memory, similarity))
             
             logger.info(f"Found {len(results)} similar memories for query")
             return results
@@ -846,10 +1043,10 @@ class RagMemoryService:
 
     def get_graph_statistics(self) -> Dict[str, Any]:
         """
-        Get statistics about the memory graph.
+        Get statistics about the memory graph and chunks.
         
         Returns:
-            Dictionary with graph statistics
+            Dictionary with graph and chunk statistics
         """
         graph_stats = self.graph_store.get_graph_stats()
         
@@ -857,6 +1054,10 @@ class RagMemoryService:
         try:
             total_memories = session.execute(select(func.count(Memory.id))).scalar() or 0
             total_edges = session.execute(select(func.count(MemoryEdge.source_id))).scalar() or 0
+            total_chunks = session.execute(select(func.count(MemoryChunk.id))).scalar() or 0
+            
+            # Calculate average chunks per memory
+            avg_chunks = total_chunks / total_memories if total_memories > 0 else 0
             
             # Get category distribution
             category_counts = session.execute(
@@ -866,6 +1067,8 @@ class RagMemoryService:
             
             return {
                 "total_memories": total_memories,
+                "total_chunks": total_chunks,
+                "average_chunks_per_memory": round(avg_chunks, 2),
                 "total_edges": total_edges,
                 "graph_nodes": graph_stats["nodes"],
                 "graph_edges": graph_stats["edges"],

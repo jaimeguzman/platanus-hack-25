@@ -3,7 +3,6 @@ Configuration settings for RAG Memory Service.
 """
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -37,6 +36,10 @@ class RagConfig:
     # Search settings
     default_search_limit: int = 10
     max_search_limit: int = 100
+    
+    # Chunking settings
+    chunk_size_words: int = 400  # Number of words per chunk
+    chunk_overlap_words: int = 80  # Number of overlapping words between chunks
     
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
