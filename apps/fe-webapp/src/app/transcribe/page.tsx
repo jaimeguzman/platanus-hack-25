@@ -167,54 +167,54 @@ export default function TranscribePage() {
   }, [audioURL]);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-[#E5E5E5] p-8">
+    <div className="min-h-screen bg-background text-foreground p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-light mb-2 flex items-center gap-3">
-            <Mic className="w-8 h-8 text-[#A67C52]" />
+            <Mic className="w-8 h-8 text-muted-foreground" />
             Speech-to-Text Demo
           </h1>
-          <p className="text-[#888888] font-light">
+          <p className="text-muted-foreground font-light">
             Sube un archivo de audio y obtén la transcripción usando OpenAI Whisper
           </p>
         </div>
 
         {/* Upload Section */}
-        <div className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-8 mb-6">
+        <div className="bg-card border border-border rounded-xl p-8 mb-6">
           {/* Recording Section */}
           {isRecordingSupported && (
             <div className="mb-6">
-              <label className="block text-sm font-light text-[#B8B8B8] mb-3">
+              <label className="block text-sm font-light text-muted-foreground mb-3">
                 Grabar audio
               </label>
 
               {!isRecording && !audioURL && (
                 <button
                   onClick={startRecording}
-                  className="w-full p-6 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#4A5C4A] transition-all duration-200 flex items-center justify-center gap-3 group"
+                  className="w-full p-6 border-2 border-dashed border-border rounded-lg hover:border-accent transition-all duration-200 flex items-center justify-center gap-3 group"
                 >
-                  <Mic className="w-8 h-8 text-[#666666] group-hover:text-[#A67C52] transition-colors" />
-                  <span className="text-[#B8B8B8] font-light">
+                  <Mic className="w-8 h-8 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <span className="text-muted-foreground font-light">
                     Presiona para grabar desde tu micrófono
                   </span>
                 </button>
               )}
 
             {isRecording && (
-              <div className="p-6 bg-[#1A1A1A] rounded-lg border border-[#4A5C4A]">
+              <div className="p-6 bg-muted rounded-lg border border-border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-[#E5E5E5] font-light">Grabando...</span>
+                    <span className="text-foreground font-light">Grabando...</span>
                   </div>
-                  <span className="text-2xl font-light text-[#E5E5E5] font-mono">
+                  <span className="text-2xl font-light text-foreground font-mono">
                     {formatTime(recordingTime)}
                   </span>
                 </div>
                 <button
                   onClick={stopRecording}
-                  className="w-full px-6 py-3 bg-[#8B4B4B] hover:bg-[#9B5B5B] text-white font-light rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full px-6 py-3 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-light rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   <Square className="w-5 h-5" />
                   Detener grabación
@@ -223,10 +223,10 @@ export default function TranscribePage() {
             )}
 
             {audioURL && (
-              <div className="p-4 bg-[#1A1A1A] rounded-lg border border-[#2A2A2A]">
+              <div className="p-4 bg-card rounded-lg border border-border">
                 <div className="flex items-center gap-3 mb-3">
-                  <CheckCircle className="w-5 h-5 text-[#4A5C4A]" />
-                  <span className="text-[#E5E5E5] font-light">Audio grabado</span>
+                  <CheckCircle className="w-5 h-5 text-accent-foreground" />
+                  <span className="text-foreground font-light">Audio grabado</span>
                 </div>
                 <audio controls className="w-full mb-3" src={audioURL}>
                   Tu navegador no soporta el elemento de audio.
@@ -237,7 +237,7 @@ export default function TranscribePage() {
                     setFile(null);
                     setRecordingTime(0);
                   }}
-                  className="text-sm text-[#666666] hover:text-[#E5E5E5] transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Grabar de nuevo
                 </button>
@@ -249,16 +249,16 @@ export default function TranscribePage() {
           {isRecordingSupported && (
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#2A2A2A]"></div>
+                <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-[#141414] text-[#666666]">O</span>
+                <span className="px-2 bg-card text-muted-foreground">O</span>
               </div>
             </div>
           )}
 
           <div className="mb-6">
-            <label className="block text-sm font-light text-[#B8B8B8] mb-3">
+            <label className="block text-sm font-light text-muted-foreground mb-3">
               Seleccionar archivo de audio
             </label>
             <div className="relative">
@@ -271,14 +271,14 @@ export default function TranscribePage() {
               />
               <label
                 htmlFor="audio-upload"
-                className="flex items-center justify-center w-full p-8 border-2 border-dashed border-[#2A2A2A] rounded-lg hover:border-[#4A5C4A] transition-all duration-200 cursor-pointer group"
+                className="flex items-center justify-center w-full p-8 border-2 border-dashed border-border rounded-lg hover:border-accent transition-all duration-200 cursor-pointer group"
               >
                 <div className="text-center">
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-[#666666] group-hover:text-[#A67C52] transition-colors" />
-                  <p className="text-[#B8B8B8] font-light">
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <p className="text-muted-foreground font-light">
                     Click para seleccionar un archivo
                   </p>
-                  <p className="text-xs text-[#666666] mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     MP3, WAV, M4A, FLAC, OGG, WEBM (Máx. 25MB)
                   </p>
                 </div>
@@ -286,18 +286,18 @@ export default function TranscribePage() {
             </div>
 
             {file && (
-              <div className="mt-4 p-4 bg-[#1A1A1A] rounded-lg border border-[#2A2A2A]">
+              <div className="mt-4 p-4 bg-card rounded-lg border border-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-[#4A5C4A]" />
+                    <CheckCircle className="w-5 h-5 text-accent-foreground" />
                     <div>
-                      <p className="text-[#E5E5E5] font-light">{file.name}</p>
-                      <p className="text-xs text-[#666666]">{formatFileSize(file.size)}</p>
+                      <p className="text-foreground font-light">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => setFile(null)}
-                    className="text-[#666666] hover:text-[#E5E5E5] transition-colors"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <XCircle className="w-5 h-5" />
                   </button>
@@ -308,13 +308,13 @@ export default function TranscribePage() {
 
           {/* Language Selection */}
           <div className="mb-6">
-            <label className="block text-sm font-light text-[#B8B8B8] mb-3">
+            <label className="block text-sm font-light text-muted-foreground mb-3">
               Idioma del audio (opcional)
             </label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-[#E5E5E5] font-light focus:outline-none focus:border-[#4A5C4A] focus:ring-1 focus:ring-[#4A5C4A] transition-all"
+              className="w-full px-4 py-3 bg-card border border-border rounded-lg text-foreground font-light focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring transition-all"
             >
               <option value="">Auto-detectar</option>
               <option value="es">Español</option>
@@ -333,7 +333,7 @@ export default function TranscribePage() {
           <button
             onClick={handleTranscribe}
             disabled={!file || isTranscribing}
-            className="w-full px-6 py-3 bg-[#4A5C4A] hover:bg-[#5A6C5A] disabled:bg-[#2A2A2A] disabled:cursor-not-allowed text-white font-light rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:cursor-not-allowed text-primary-foreground font-light rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
           >
             {isTranscribing ? (
               <>
@@ -351,12 +351,12 @@ export default function TranscribePage() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-[#8B4B4B] bg-opacity-20 border border-[#8B4B4B] rounded-lg p-4 mb-6">
+          <div className="bg-destructive/20 border border-destructive rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-[#8B4B4B] flex-shrink-0 mt-0.5" />
+              <XCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-[#8B4B4B] font-light">{error}</p>
-                <p className="text-xs text-[#666666] mt-1">
+                <p className="text-destructive font-light">{error}</p>
+                <p className="text-xs text-muted-foreground mt-1">
                   Asegúrate de que la API esté corriendo en {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
                 </p>
               </div>
@@ -366,14 +366,14 @@ export default function TranscribePage() {
 
         {/* Transcription Result */}
         {transcription && (
-          <div className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-8">
+          <div className="bg-card border border-border rounded-xl p-8">
             <div className="flex items-center gap-3 mb-4">
-              <CheckCircle className="w-6 h-6 text-[#4A5C4A]" />
-              <h2 className="text-xl font-light text-[#E5E5E5]">Transcripción</h2>
+              <CheckCircle className="w-6 h-6 text-accent-foreground" />
+              <h2 className="text-xl font-light text-foreground">Transcripción</h2>
             </div>
 
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-6">
-              <p className="text-[#E5E5E5] font-light leading-relaxed whitespace-pre-wrap">
+            <div className="bg-muted border border-border rounded-lg p-6">
+              <p className="text-foreground font-light leading-relaxed whitespace-pre-wrap">
                 {transcription}
               </p>
             </div>
@@ -381,7 +381,7 @@ export default function TranscribePage() {
             <div className="mt-4 flex gap-3">
               <button
                 onClick={() => navigator.clipboard.writeText(transcription)}
-                className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#2A2A2A] rounded-lg text-sm font-light transition-colors"
+                className="px-4 py-2 bg-card hover:bg-muted border border-border rounded-lg text-sm font-light transition-colors"
               >
                 Copiar texto
               </button>
@@ -390,7 +390,7 @@ export default function TranscribePage() {
                   setTranscription('');
                   setFile(null);
                 }}
-                className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#2A2A2A] rounded-lg text-sm font-light transition-colors"
+                className="px-4 py-2 bg-card hover:bg-muted border border-border rounded-lg text-sm font-light transition-colors"
               >
                 Nueva transcripción
               </button>
@@ -399,9 +399,9 @@ export default function TranscribePage() {
         )}
 
         {/* Info Section */}
-        <div className="mt-8 p-6 bg-[#141414] border border-[#2A2A2A] rounded-xl">
-          <h3 className="text-lg font-light mb-3 text-[#E5E5E5]">Información</h3>
-          <ul className="space-y-2 text-sm text-[#888888] font-light">
+        <div className="mt-8 p-6 bg-card border border-border rounded-xl">
+          <h3 className="text-lg font-light mb-3 text-foreground">Información</h3>
+          <ul className="space-y-2 text-sm text-muted-foreground font-light">
             <li>• Formatos soportados: MP3, WAV, M4A, FLAC, OGG, WEBM</li>
             <li>• Tamaño máximo: 25MB</li>
             <li>• Motor: OpenAI Whisper</li>

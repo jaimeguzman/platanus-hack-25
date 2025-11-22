@@ -5,7 +5,7 @@
 export const SPACING = {
   // Header
   header: {
-    height: 'h-16',
+    height: 'h-12',
     paddingX: 'px-6 lg:px-8',
     gap: 'gap-6',
   },
@@ -13,12 +13,12 @@ export const SPACING = {
   // Sidebar
   sidebar: {
     width: 'w-64',
-    widthCollapsed: 'w-0',
+    widthCollapsed: 'w-16',
     paddingX: 'px-5',
     paddingY: 'py-6',
     gap: 'gap-4',
-    logoHeight: 'h-16', // Same as header height
-    contentPaddingX: 'px-4', // Padding for sidebar content sections
+    logoHeight: 'h-16',
+    contentPaddingX: 'px-4',
   },
   
   // Buttons
@@ -86,7 +86,7 @@ export const SPACING = {
   
   // Search
   search: {
-    maxWidth: 'max-w-lg',
+    maxWidth: 'max-w-md',
     marginX: 'mx-6 lg:mx-8',
   },
 } as const;

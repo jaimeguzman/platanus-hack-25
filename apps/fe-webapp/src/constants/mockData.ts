@@ -8,28 +8,28 @@ export const MOCK_PROJECTS: Project[] = [
   {
     id: 'default',
     name: 'Personal',
-    color: '#8B5CF6',
+    color: '#6B7280', // Gray-500 - neutral
     createdAt: new Date(),
     noteCount: 3,
   },
   {
     id: 'work',
     name: 'Trabajo',
-    color: '#3B82F6',
+    color: '#4B5563', // Gray-600 - slightly darker
     createdAt: new Date(),
     noteCount: 2,
   },
   {
     id: 'ideas',
     name: 'Ideas',
-    color: '#10B981',
+    color: '#9CA3AF', // Gray-400 - slightly lighter
     createdAt: new Date(),
     noteCount: 2,
   },
   {
     id: 'learning',
     name: 'Aprendizaje',
-    color: '#F59E0B',
+    color: '#6B7280', // Gray-500 - neutral
     createdAt: new Date(),
     noteCount: 1,
   },
@@ -192,7 +192,7 @@ export const DEFAULT_VALUES = {
   },
   project: {
     name: 'Nuevo proyecto',
-    color: '#3B82F6',
+    color: '#6B7280', // Gray-500 - neutral
   },
 };
 

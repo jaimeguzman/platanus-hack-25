@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { usePKMStore } from '@/stores/pkmStore';
+import { useNotes } from '@/hooks/useNotes';
+import { useUser } from '@/contexts/UserContext';
 import {
   FileText,
   Plus,
@@ -18,11 +20,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/utils/cn';
-import { SPACING } from '@/constants/spacing';
 import { DEFAULT_VALUES, NUMERIC_CONSTANTS } from '@/constants/mockData';
 
 const PROJECT_COLORS = [
-  '#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1', '#14B8A6'
+  '#6B7280', '#4B5563', '#9CA3AF', '#52525B', '#71717A', '#78716C', '#57534E', '#3F3F46'
 ];
 
 const Sidebar: React.FC = () => {
@@ -35,8 +36,12 @@ const Sidebar: React.FC = () => {
     addNote,
     addProject,
     getRecentNotes,
-    getPinnedNotes
+    getPinnedNotes,
+    sidebarOpen
   } = usePKMStore();
+
+  const { user } = useUser();
+  const { createNote } = useNotes();
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(['default']));
   const [activeNav, setActiveNav] = useState('home');
@@ -54,14 +59,35 @@ const Sidebar: React.FC = () => {
     setExpandedProjects(newExpanded);
   };
 
-  const handleNewNote = () => {
-    const newNoteId = addNote({
-      title: DEFAULT_VALUES.note.title,
-      content: DEFAULT_VALUES.note.content,
-      tags: [...DEFAULT_VALUES.note.tags],
-      projectId: selectedProjectId ?? undefined
-    });
-    setActiveNote(newNoteId);
+  const handleNewNote = async () => {
+    if (user) {
+      try {
+        await createNote({
+          userId: user.id,
+          title: DEFAULT_VALUES.note.title,
+          content: DEFAULT_VALUES.note.content,
+          tags: [...DEFAULT_VALUES.note.tags],
+          projectId: selectedProjectId || undefined,
+        });
+      } catch (error) {
+        console.error('Error creating note:', error);
+        const newNoteId = addNote({
+          title: DEFAULT_VALUES.note.title,
+          content: DEFAULT_VALUES.note.content,
+          tags: [...DEFAULT_VALUES.note.tags],
+          projectId: selectedProjectId ?? undefined
+        });
+        setActiveNote(newNoteId);
+      }
+    } else {
+      const newNoteId = addNote({
+        title: DEFAULT_VALUES.note.title,
+        content: DEFAULT_VALUES.note.content,
+        tags: [...DEFAULT_VALUES.note.tags],
+        projectId: selectedProjectId ?? undefined
+      });
+      setActiveNote(newNoteId);
+    }
   };
 
   const projectNotes = (projectId: string) => {
@@ -87,17 +113,43 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  const handleAddNoteToProject = (projectId: string) => {
-    const newNoteId = addNote({
-      title: DEFAULT_VALUES.note.title,
-      content: DEFAULT_VALUES.note.content,
-      tags: DEFAULT_VALUES.note.tags,
-      projectId: projectId
-    });
-    setActiveNote(newNoteId);
-    // Expandir el proyecto si no está expandido
-    if (!expandedProjects.has(projectId)) {
-      setExpandedProjects(prev => new Set([...prev, projectId]));
+  const handleAddNoteToProject = async (projectId: string) => {
+    if (user) {
+      try {
+        await createNote({
+          userId: user.id,
+          title: DEFAULT_VALUES.note.title,
+          content: DEFAULT_VALUES.note.content,
+          tags: DEFAULT_VALUES.note.tags,
+          projectId: projectId,
+        });
+        if (!expandedProjects.has(projectId)) {
+          setExpandedProjects(prev => new Set([...prev, projectId]));
+        }
+      } catch (error) {
+        console.error('Error creating note:', error);
+        const newNoteId = addNote({
+          title: DEFAULT_VALUES.note.title,
+          content: DEFAULT_VALUES.note.content,
+          tags: DEFAULT_VALUES.note.tags,
+          projectId: projectId
+        });
+        setActiveNote(newNoteId);
+        if (!expandedProjects.has(projectId)) {
+          setExpandedProjects(prev => new Set([...prev, projectId]));
+        }
+      }
+    } else {
+      const newNoteId = addNote({
+        title: DEFAULT_VALUES.note.title,
+        content: DEFAULT_VALUES.note.content,
+        tags: DEFAULT_VALUES.note.tags,
+        projectId: projectId
+      });
+      setActiveNote(newNoteId);
+      if (!expandedProjects.has(projectId)) {
+        setExpandedProjects(prev => new Set([...prev, projectId]));
+      }
     }
   };
 
@@ -107,34 +159,90 @@ const Sidebar: React.FC = () => {
     setIsAddingProject(false);
   };
 
+  if (!sidebarOpen) {
+    return (
+      <div className="h-full w-16 bg-sidebar border-r border-sidebar-border/50 flex flex-col items-center py-3">
+        <Button
+          onClick={handleNewNote}
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent"
+          title="Nueva nota"
+          aria-label="Nueva nota"
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
+        <div className="mt-2 space-y-1 w-full flex flex-col items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setActiveNav('home'); setSelectedProject(null); }}
+            className={cn("h-9 w-9 mx-auto", activeNav === 'home' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground')}
+            title="Inicio"
+            aria-label="Inicio"
+          >
+            <Home className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setActiveNav('recent')}
+            className={cn("h-9 w-9 mx-auto", activeNav === 'recent' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground')}
+            title="Recientes"
+            aria-label="Recientes"
+          >
+            <Clock className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setActiveNav('starred')}
+            className={cn("h-9 w-9 mx-auto", activeNav === 'starred' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground')}
+            title="Favoritos"
+            aria-label="Favoritos"
+          >
+            <Star className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="mt-auto w-full flex justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            title="Configuración"
+            aria-label="Configuración"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full w-64 bg-sidebar border-r border-border flex flex-col flex-shrink-0">
-      {/* Workspace/Header - Logo Section */}
-      <div className={cn(
-        'flex items-center border-b border-border',
-        SPACING.sidebar.paddingX,
-        SPACING.sidebar.logoHeight
-      )}>
+    <div className="h-full w-64 bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0">
+      {/* Workspace/Header */}
+      <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
         <Button
           variant="ghost"
-          className="w-full justify-start h-full px-0 py-0 text-base font-bold hover:bg-transparent text-foreground transition-colors group"
+          className="w-full justify-start h-full px-0 hover:bg-transparent"
           aria-label="SecondBrain workspace"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-600 flex items-center justify-center mr-3 flex-shrink-0 shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-sidebar-foreground flex items-center justify-center mr-3 flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-sidebar" />
           </div>
-          <div className="flex flex-col items-start justify-center">
-            <span className="text-base font-bold text-foreground leading-tight tracking-tight">SecondBrain</span>
-            <span className="text-[11px] text-muted-foreground font-medium">Tu segundo cerebro</span>
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-semibold">SecondBrain</span>
+            <span className="text-xs text-muted-foreground">Tu segundo cerebro</span>
           </div>
         </Button>
       </div>
 
       {/* Quick Actions */}
-      <div className={cn(SPACING.sidebar.contentPaddingX, 'py-3 border-b border-border')}>
+      <div className="px-3 py-3 border-b border-sidebar-border">
         <Button
           onClick={handleNewNote}
-          className="w-full justify-start h-9 px-3 text-sm font-medium bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all"
+          className="w-full justify-start h-9 px-3 text-sm font-medium bg-sidebar-foreground hover:bg-sidebar-foreground/90 text-sidebar"
           size="sm"
         >
           <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
@@ -144,17 +252,17 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Main Navigation */}
-      <div className={cn(SPACING.sidebar.contentPaddingX, 'py-3 border-b border-border space-y-0.5')}>
+      <div className="px-2 py-2 border-b border-sidebar-border space-y-0.5">
         <Button
           variant="ghost"
           onClick={() => { setActiveNav('home'); setSelectedProject(null); }}
           className={cn(
-            "w-full justify-start h-9 px-3 text-sm font-medium transition-colors",
-            activeNav === 'home' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            "w-full justify-start h-8 px-2 text-sm",
+            activeNav === 'home' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
           )}
           size="sm"
         >
-          <Home className="w-4 h-4 mr-3 flex-shrink-0" />
+          <Home className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">Inicio</span>
           <span className="text-xs text-muted-foreground">{notes.length}</span>
         </Button>
@@ -162,24 +270,24 @@ const Sidebar: React.FC = () => {
           variant="ghost"
           onClick={() => setActiveNav('recent')}
           className={cn(
-            "w-full justify-start h-9 px-3 text-sm font-medium transition-colors",
-            activeNav === 'recent' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            "w-full justify-start h-8 px-2 text-sm",
+            activeNav === 'recent' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
           )}
           size="sm"
         >
-          <Clock className="w-4 h-4 mr-3 flex-shrink-0" />
+          <Clock className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">Recientes</span>
         </Button>
         <Button
           variant="ghost"
           onClick={() => setActiveNav('starred')}
           className={cn(
-            "w-full justify-start h-9 px-3 text-sm font-medium transition-colors",
-            activeNav === 'starred' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            "w-full justify-start h-8 px-2 text-sm",
+            activeNav === 'starred' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
           )}
           size="sm"
         >
-          <Star className="w-4 h-4 mr-3 flex-shrink-0" />
+          <Star className="w-4 h-4 mr-2" />
           <span className="flex-1 text-left">Favoritos</span>
           {pinnedNotes.length > 0 && (
             <span className="text-xs text-muted-foreground">{pinnedNotes.length}</span>
@@ -187,13 +295,13 @@ const Sidebar: React.FC = () => {
         </Button>
       </div>
 
-      {/* Content Section - Changes based on activeNav */}
-      <div className={cn('flex-1 overflow-y-auto py-3 min-h-0', SPACING.sidebar.contentPaddingX)}>
+      {/* Content Section */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
         {/* Recientes Section */}
         {activeNav === 'recent' && (
           <>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recientes</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recientes</span>
             </div>
             <div className="space-y-0.5">
               {getRecentNotes().length > 0 ? (
@@ -208,7 +316,7 @@ const Sidebar: React.FC = () => {
                     <FileText className="w-3.5 h-3.5 mr-2 flex-shrink-0 opacity-60" />
                     <span className="flex-1 text-left truncate">{note.title}</span>
                     {note.isPinned && (
-                      <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0 ml-1" />
+                      <Star className="w-3 h-3 text-foreground fill-foreground flex-shrink-0 ml-1" />
                     )}
                   </Button>
                 ))
@@ -225,8 +333,8 @@ const Sidebar: React.FC = () => {
         {/* Favoritos Section */}
         {activeNav === 'starred' && (
           <>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Favoritos</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Favoritos</span>
             </div>
             <div className="space-y-0.5">
               {getPinnedNotes().length > 0 ? (
@@ -238,7 +346,7 @@ const Sidebar: React.FC = () => {
                     className="w-full justify-start h-8 px-2 text-[13px] font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors rounded-md"
                     size="sm"
                   >
-                    <Star className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-amber-500 fill-amber-500" />
+                    <Star className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-foreground fill-foreground" />
                     <span className="flex-1 text-left truncate">{note.title}</span>
                   </Button>
                 ))
@@ -253,15 +361,15 @@ const Sidebar: React.FC = () => {
           </>
         )}
 
-        {/* Projects Section - Shows on home or project */}
+        {/* Projects Section */}
         {(activeNav === 'home' || activeNav === 'project') && (
           <>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proyectos</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proyectos</span>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="h-6 w-6 text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
                 title="Agregar proyecto"
                 onClick={() => setIsAddingProject(true)}
               >
@@ -271,7 +379,7 @@ const Sidebar: React.FC = () => {
 
         {/* Add Project Form */}
         {isAddingProject && (
-          <div className="mb-3 p-4 bg-card rounded-xl border border-border shadow-lg">
+          <div className="mb-3 p-4 bg-sidebar-accent rounded-lg border border-sidebar-border">
             <p className="text-xs font-medium text-muted-foreground mb-3">Nuevo proyecto</p>
             <Input
               type="text"
@@ -305,7 +413,7 @@ const Sidebar: React.FC = () => {
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
-                className="flex-1 h-8 text-xs bg-violet-500 hover:bg-violet-600 text-white font-medium"
+                className="flex-1 h-9 text-xs bg-foreground hover:bg-foreground/90 text-background font-medium"
                 onClick={handleAddProject}
                 disabled={!newProjectName.trim()}
               >
@@ -315,7 +423,7 @@ const Sidebar: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 px-3 text-xs"
+                className="h-9 px-3 text-xs"
                 onClick={handleCancelAddProject}
               >
                 <X className="w-3.5 h-3.5" />
@@ -325,7 +433,7 @@ const Sidebar: React.FC = () => {
         )}
 
         {/* Projects Tree */}
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {projects.map((project) => {
             const pNotes = projectNotes(project.id);
             const isExpanded = expandedProjects.has(project.id);
@@ -383,7 +491,7 @@ const Sidebar: React.FC = () => {
 
                 {/* Project Notes */}
                 {isExpanded && (
-                  <div className="ml-5 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+                  <div className="ml-5 mt-1 space-y-1 border-l border-border/50 pl-2">
                     {pNotes.length > 0 ? (
                       <>
                         {pNotes.slice(0, NUMERIC_CONSTANTS.projectNotesLimit).map((note) => (
@@ -391,13 +499,13 @@ const Sidebar: React.FC = () => {
                             key={note.id}
                             onClick={() => setActiveNote(note.id)}
                             variant="ghost"
-                            className="w-full justify-start h-7 px-2 text-[13px] font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors rounded-md"
+                            className="w-full justify-start h-8 px-2 text-[13px] font-normal text-muted-foreground hover:text-foreground hover:bg-accent transition-colors rounded-md"
                             size="sm"
                           >
                             <FileText className="w-3 h-3 mr-2 flex-shrink-0 opacity-60" />
                             <span className="flex-1 text-left truncate">{note.title}</span>
                             {note.isPinned && (
-                              <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0 ml-1" />
+                              <Star className="w-3 h-3 text-foreground fill-foreground flex-shrink-0 ml-1" />
                             )}
                           </Button>
                         ))}
@@ -414,7 +522,7 @@ const Sidebar: React.FC = () => {
                           onClick={() => handleAddNoteToProject(project.id)}
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-[11px] text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+                          className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent"
                         >
                           <Plus className="w-3 h-3 mr-1" />
                           Crear primera nota
@@ -430,14 +538,14 @@ const Sidebar: React.FC = () => {
 
         {/* Tags Section */}
         <div className="mt-6">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tags</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 px-1">
+          <div className="flex flex-wrap gap-1.5">
             {Array.from(new Set(notes.flatMap(n => n.tags))).slice(0, 8).map(tag => (
               <span
                 key={tag}
-                className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-violet-500/10 text-violet-400 rounded-md cursor-pointer hover:bg-violet-500/20 transition-colors"
+                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-sidebar-accent text-muted-foreground rounded-md cursor-pointer hover:bg-sidebar-accent/80"
               >
                 #{tag}
               </span>
@@ -449,13 +557,13 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <div className={cn(SPACING.sidebar.contentPaddingX, 'py-3 border-t border-border')}>
+      <div className="px-3 py-3 border-t border-sidebar-border">
         <Button
           variant="ghost"
-          className="w-full justify-start h-8 px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="w-full justify-start h-8 px-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           size="sm"
         >
-          <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
+          <Settings className="w-4 h-4 mr-2" />
           Configuración
         </Button>
       </div>

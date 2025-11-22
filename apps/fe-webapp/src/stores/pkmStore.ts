@@ -18,7 +18,7 @@ interface PKMState {
   viewMode: 'editor' | 'graph' | 'split';
 
   // Actions
-  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>, userId?: string) => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   setActiveNote: (id: string | null) => void;

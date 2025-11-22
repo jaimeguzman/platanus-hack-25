@@ -18,6 +18,7 @@ const NoteEditor: React.FC = () => {
   const [isPreview, setIsPreview] = useState(false);
   const [localContent, setLocalContent] = useState('');
   const [newTag, setNewTag] = useState('');
+  const [showTagInput, setShowTagInput] = useState(false);
   
   const activeNote = activeNoteId ? getNoteById(activeNoteId) : null;
   const project = activeNote ? projects.find(p => p.id === activeNote.projectId) : null;
@@ -86,8 +87,8 @@ const NoteEditor: React.FC = () => {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center max-w-lg px-6">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
-            <Edit3 className="w-10 h-10 text-violet-400" />
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted flex items-center justify-center">
+            <Edit3 className="w-10 h-10 text-muted-foreground" />
           </div>
           <h3 className="text-2xl font-semibold text-foreground mb-3 tracking-tight">Selecciona una nota</h3>
           <p className="text-muted-foreground text-base leading-relaxed">
@@ -102,7 +103,7 @@ const NoteEditor: React.FC = () => {
     <div className="flex-1 flex flex-col bg-background">
       {/* Breadcrumbs */}
       {project && (
-        <div className="px-8 py-3 border-b border-border bg-muted/30">
+        <div className="px-4 lg:px-6 py-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div
               className="w-2 h-2 rounded-sm"
@@ -116,7 +117,7 @@ const NoteEditor: React.FC = () => {
       )}
 
       {/* Note Header */}
-      <div className="px-8 py-5 border-b border-border space-y-3">
+      <div className="px-4 lg:px-6 py-4 border-b border-border space-y-4">
         <div className="flex items-center justify-between gap-4">
           <Input
             type="text"
@@ -126,9 +127,9 @@ const NoteEditor: React.FC = () => {
             placeholder="Sin título"
           />
           {/* Botones de acción agrupados */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Toggle Preview/Edit */}
-            <div className="flex items-center bg-muted/50 rounded-lg p-1 gap-1">
+            <div className="flex items-center bg-muted rounded-md p-1 gap-1">
               <Button
                 onClick={() => setIsPreview(false)}
                 variant="ghost"
@@ -160,10 +161,10 @@ const NoteEditor: React.FC = () => {
             </div>
 
             {/* Separador */}
-            <div className="h-6 w-px bg-border" />
+            <div className="h-8 w-px bg-border" />
 
             {/* Favorito, Guardar y Exportar */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <Button
                 onClick={handleTogglePinned}
                 variant="ghost"
@@ -171,12 +172,12 @@ const NoteEditor: React.FC = () => {
                 className={cn(
                   "h-8 px-3 text-sm hover:bg-accent transition-colors",
                   activeNote.isPinned
-                    ? "text-amber-500 hover:text-amber-400"
+                    ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 title={activeNote.isPinned ? "Quitar de favoritos" : "Agregar a favoritos"}
               >
-                <Star className={cn("w-4 h-4 mr-2", activeNote.isPinned && "fill-amber-500")} />
+                <Star className={cn("w-4 h-4 mr-2", activeNote.isPinned && "fill-current")} />
                 {activeNote.isPinned ? "Favorito" : "Favorito"}
               </Button>
               <Button
@@ -204,10 +205,10 @@ const NoteEditor: React.FC = () => {
         </div>
 
         {/* Metadata */}
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
-            <span className="font-medium">{new Date(activeNote.updatedAt).toLocaleDateString('es-ES', {
+            <span>{new Date(activeNote.updatedAt).toLocaleDateString('es-ES', {
               month: 'short',
               day: 'numeric',
               year: 'numeric'
@@ -215,23 +216,23 @@ const NoteEditor: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <Hash className="w-4 h-4" />
-            <span className="font-medium">{activeNote.tags.length} {activeNote.tags.length === 1 ? 'tag' : 'tags'}</span>
+            <span>{activeNote.tags.length} {activeNote.tags.length === 1 ? 'tag' : 'tags'}</span>
           </div>
         </div>
 
         {/* Tags */}
         {activeNote.tags.length > 0 && (
-          <div className="flex items-center flex-wrap gap-2 pt-2">
+          <div className="flex items-center flex-wrap gap-2 mt-2">
             {activeNote.tags.map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:border-violet-500/40 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-muted text-muted-foreground hover:bg-muted/80"
               >
                 <span>#{tag}</span>
                 <button
                   onClick={() => handleTagRemove(tag)}
-                  className="hover:bg-violet-500/20 rounded-full w-4 h-4 flex items-center justify-center transition-colors -mr-0.5"
+                  className="hover:bg-muted-foreground/10 rounded-sm w-3.5 h-3.5 flex items-center justify-center"
                   aria-label={`Eliminar tag ${tag}`}
                 >
                   <X className="w-3 h-3" />
@@ -241,35 +242,47 @@ const NoteEditor: React.FC = () => {
           </div>
         )}
 
-        {/* Add tag input */}
-        <div className="flex items-center gap-2 pt-2">
-          <Input
-            type="text"
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            placeholder="Agregar tag..."
-            className="w-40 h-8 text-sm border border-border bg-muted/50 text-foreground focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all placeholder:text-muted-foreground"
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
+        {/* Add tag input (colapsado) */}
+        <div className="flex items-center gap-2 mt-2">
+          {showTagInput && (
+            <Input
+              type="text"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              placeholder="Agregar tag..."
+              className="w-40 h-8 text-xs bg-muted border-transparent focus-visible:ring-1 focus-visible:ring-ring"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleTagAdd();
+                  setShowTagInput(false);
+                }
+              }}
+            />
+          )}
+          <Button
+            onClick={() => {
+              if (showTagInput && newTag.trim()) {
                 handleTagAdd();
+                setShowTagInput(false);
+              } else {
+                setShowTagInput((v) => !v);
               }
             }}
-          />
-          <Button
-            onClick={handleTagAdd}
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="h-8 px-2 text-xs"
+            title={showTagInput ? 'Agregar tag' : 'Nuevo tag'}
+            aria-label={showTagInput ? 'Agregar tag' : 'Nuevo tag'}
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3 h-3" />
           </Button>
         </div>
       </div>
-      
-      {/* Editor Content - Minimalist and elegant */}
+
+      {/* Editor Content */}
       <div className="flex-1 overflow-hidden">
         {isPreview ? (
-          <div className="h-full overflow-y-auto px-12 py-10 prose prose-lg max-w-none">
+          <div className="h-full overflow-y-auto px-4 lg:px-6 py-6 prose max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
@@ -310,17 +323,17 @@ const NoteEditor: React.FC = () => {
               defaultLanguage="markdown"
               value={localContent}
               onChange={handleContentChange}
-              theme="vs-dark"
+              theme="light"
               options={{
                 minimap: { enabled: false },
                 wordWrap: 'on',
-                lineNumbers: 'on',
-                fontSize: 15,
-                fontFamily: 'Monaco, "SF Mono", Monaco, Menlo, "Ubuntu Mono", monospace',
+                lineNumbers: 'off',
+                fontSize: 16,
+                fontFamily: 'ui-sans-serif, system-ui, sans-serif',
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
-                renderWhitespace: 'selection',
-                bracketPairColorization: { enabled: true },
+                renderWhitespace: 'none',
+                bracketPairColorization: { enabled: false },
                 suggest: {
                   showWords: true,
                   showSnippets: true
@@ -329,13 +342,13 @@ const NoteEditor: React.FC = () => {
                 tabSize: 2,
                 insertSpaces: true,
                 formatOnPaste: true,
-                formatOnType: true,
+                formatOnType: false,
                 lineHeight: 24,
-                padding: { top: 32, bottom: 32 },
-                cursorStyle: 'line-thin',
-                cursorBlinking: 'smooth',
+                padding: { top: 24, bottom: 24 },
+                cursorStyle: 'line',
+                cursorBlinking: 'blink',
                 selectionHighlight: false,
-                renderLineHighlight: 'line'
+                renderLineHighlight: 'none'
               }}
             />
           </div>

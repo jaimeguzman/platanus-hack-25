@@ -15,13 +15,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { Search, X } from 'lucide-react';
+import { Search, X, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { SPACING } from '@/constants/spacing';
 import { DEFAULT_VALUES, FALLBACK_VALUES } from '@/constants/mockData';
 
 export default function Home() {
-  const { viewMode, sidebarOpen, setViewMode } = usePKMStore();
+  const { viewMode, sidebarOpen, setViewMode, toggleSidebar } = usePKMStore();
   const [showAudioTranscriber, setShowAudioTranscriber] = useState(false);
 
   const handleNewNote = useCallback(() => {
@@ -79,26 +79,26 @@ export default function Home() {
       {/* Sidebar - ClickUp style: wider with tree structure */}
       <div className={cn(
         'transition-all duration-300 flex-shrink-0',
-        sidebarOpen ? SPACING.sidebar.width : SPACING.sidebar.widthCollapsed + ' overflow-hidden'
+        sidebarOpen ? SPACING.sidebar.width : SPACING.sidebar.widthCollapsed
       )}>
-        {sidebarOpen && <Sidebar />}
+        <Sidebar />
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Header - ClickUp style: compact and clean */}
+        {/* Header minimal */}
         <header
           role="banner"
           className={cn(
             'bg-background border-b border-border',
             SPACING.header.height,
-            'flex items-center justify-between',
+            'grid grid-cols-[auto_1fr_auto] items-center',
             SPACING.header.paddingX,
             'sticky top-0 z-10'
           )}
           aria-label="Application header"
         >
-          {/* Left: Breadcrumbs */}
+          {/* Left: Sidebar trigger + Breadcrumbs */}
           {selectedProject && (
             <nav 
               className={cn(
@@ -108,6 +108,20 @@ export default function Home() {
               )}
               aria-label="Breadcrumb navigation"
             >
+              <Button
+                onClick={toggleSidebar}
+                variant="ghost"
+                size="icon"
+                aria-label={sidebarOpen ? 'Colapsar barra lateral' : 'Expandir barra lateral'}
+                className="h-8 w-8"
+                title={sidebarOpen ? 'Colapsar barra lateral' : 'Expandir barra lateral'}
+              >
+                {sidebarOpen ? (
+                  <PanelLeftClose className="w-4 h-4" />
+                ) : (
+                  <PanelLeftOpen className="w-4 h-4" />
+                )}
+              </Button>
               <ol className={cn('flex items-center', SPACING.breadcrumb.gap)} aria-label="Breadcrumb">
                 <li>
                   <span 
@@ -125,8 +139,8 @@ export default function Home() {
           )}
 
           {/* Center: Search */}
-          <div className={cn('flex-1', SPACING.search.maxWidth, SPACING.search.marginX)} role="search" aria-label="Search notes">
-            <div className="relative">
+          <div className={cn('flex justify-center', SPACING.search.maxWidth, SPACING.search.marginX)} role="search" aria-label="Search notes">
+            <div className="relative w-full">
               <label htmlFor="search-notes" className="sr-only">
                 Buscar notas
               </label>
@@ -137,6 +151,7 @@ export default function Home() {
                 aria-label="Buscar notas"
                 aria-describedby="search-description"
                 className={cn(
+                  'h-9 bg-muted border-transparent focus-visible:ring-1 focus-visible:ring-ring',
                   SPACING.input.paddingRightWithIcon
                 )}
               />
@@ -159,52 +174,6 @@ export default function Home() {
             className={cn('flex items-center flex-shrink-0', SPACING.gap.md)}
             aria-label="Main actions"
           >
-            {/* Mostrar Nuevo y Audio solo cuando NO estamos en vista de grafo */}
-            {viewMode === 'editor' && (
-              <>
-                <Button
-                  onClick={handleNewNote}
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Crear nueva nota"
-                  title="Crear nueva nota (Ctrl+N)"
-                  className={cn(
-                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                    SPACING.button.sm.height,
-                    SPACING.button.sm.paddingX,
-                    SPACING.button.sm.fontSize
-                  )}
-                >
-                  Nueva nota
-                </Button>
-                <Button
-                  onClick={() => setShowAudioTranscriber(true)}
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Abrir transcriptor de audio"
-                  title="Transcribir audio a texto"
-                  className={cn(
-                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                    SPACING.button.sm.height,
-                    SPACING.button.sm.paddingX,
-                    SPACING.button.sm.fontSize
-                  )}
-                >
-                  Nuevo audio
-                </Button>
-                <div
-                  className={cn(
-                    'bg-border',
-                    SPACING.separator.height,
-                    SPACING.separator.width,
-                    SPACING.separator.marginX
-                  )}
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-hidden="true"
-                />
-              </>
-            )}
 
             {/* Mostrar botón Salir cuando estamos en vista de grafo o dividida */}
             {(viewMode === 'graph' || viewMode === 'split') && (
@@ -306,17 +275,6 @@ export default function Home() {
                 Dividir
               </Button>
             </div>
-            <div
-              className={cn(
-                'bg-border',
-                SPACING.separator.height,
-                SPACING.separator.width,
-                SPACING.separator.marginX
-              )}
-              role="separator"
-              aria-orientation="vertical"
-              aria-hidden="true"
-            />
             <ThemeToggle />
           </nav>
         </header>

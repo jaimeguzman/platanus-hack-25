@@ -3,16 +3,16 @@ import { useState, useEffect } from 'react';
 type Theme = 'light' | 'dark';
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   // Initialize theme on mount (client-side only)
   useEffect(() => {
     setMounted(true);
-    // Check if there's a saved theme preference or use system preference
-    const savedTheme = document.documentElement.classList.contains('light') ? 'light' : 
+    // Check if there's a saved theme preference or use light as default
+    const savedTheme = document.documentElement.classList.contains('light') ? 'light' :
                       document.documentElement.classList.contains('dark') ? 'dark' :
-                      window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                      'light'; // Default to light theme (less eye fatigue)
     setTheme(savedTheme);
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(savedTheme);
