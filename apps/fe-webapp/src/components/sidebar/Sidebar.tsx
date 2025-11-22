@@ -12,11 +12,22 @@ import {
   Heart,
   Plus,
   Star,
+  Brain,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '@/components/ui/sidebar';
 import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
 import { EMPTY_NOTE } from '@/data/mockData';
 
@@ -26,7 +37,8 @@ const PILLARS = [
   { id: 'hobby', label: 'Hobby', icon: Heart },
 ] as const;
 
-export function Sidebar() {
+export function AppSidebar() {
+  const { state } = useSidebar();
   const {
     viewMode,
     setViewMode,
@@ -40,7 +52,6 @@ export function Sidebar() {
     setShowFavoritesOnly,
     getFavoriteNotes,
   } = useNoteStore();
-
 
   const recentNotes = notes
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -67,152 +78,173 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-card">
+    <Sidebar collapsible="icon" variant="sidebar">
       {/* Header */}
-      <div className="p-4">
-        <h1 className="text-lg font-semibold">Segundo Cerebro</h1>
-        <p className="text-xs text-muted-foreground">PKM System</p>
-      </div>
-
-      <Separator />
-
-      {/* Search */}
-      <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={UI_MESSAGES.SEARCH_PLACEHOLDER}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
-          />
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-2">
+          <Brain className="h-5 w-5 shrink-0" />
+          {state === 'expanded' && (
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-lg font-semibold truncate">Segundo Cerebro</h1>
+              <p className="text-xs text-muted-foreground truncate">PKM System</p>
+            </div>
+          )}
         </div>
-      </div>
+      </SidebarHeader>
 
-      <Separator />
+      <SidebarContent>
+        {/* Search */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <SidebarInput
+                    placeholder={UI_MESSAGES.SEARCH_PLACEHOLDER}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-2">
-            <Button
-              variant={viewMode === 'dashboard' ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => setViewMode('dashboard')}
-            >
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </Button>
-            <Button
-              variant={viewMode === 'graph' ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => setViewMode('graph')}
-            >
-              <Network className="mr-2 h-4 w-4" />
-              Graph View
-            </Button>
-            <Button
-              variant={viewMode === 'note' ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => setViewMode('note')}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Notas
-            </Button>
-            <Button
-              variant={showFavoritesOnly ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            >
-              <Star className={`mr-2 h-4 w-4 ${showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-              Favoritos ({getFavoriteNotes().length})
-            </Button>
-          </div>
+        {/* Navigation */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setViewMode('dashboard')}
+                  isActive={viewMode === 'dashboard'}
+                  tooltip="Dashboard"
+                >
+                  <LayoutDashboard />
+                  <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setViewMode('graph')}
+                  isActive={viewMode === 'graph'}
+                  tooltip="Graph View"
+                >
+                  <Network />
+                  <span>Graph View</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setViewMode('note')}
+                  isActive={viewMode === 'note'}
+                  tooltip="Notas"
+                >
+                  <FileText />
+                  <span>Notas</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  isActive={showFavoritesOnly}
+                  tooltip={`Favoritos (${getFavoriteNotes().length})`}
+                >
+                  <Star className={showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''} />
+                  <span>Favoritos</span>
+                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-sidebar-primary text-xs text-sidebar-primary-foreground">
+                    {getFavoriteNotes().length}
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          <Separator className="my-4" />
-
-          {/* Pillars */}
-          <div className="px-4 pb-4">
-            <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase">
-              Pilares
-            </h3>
-            <div className="space-y-1">
-              <Button
-                variant={selectedPillar === 'all' ? 'secondary' : 'ghost'}
-                className="w-full justify-start text-xs"
-                onClick={() => setSelectedPillar('all')}
-              >
-                Todos
-              </Button>
+        {/* Pillars */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Pilares</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setSelectedPillar('all')}
+                  isActive={selectedPillar === 'all'}
+                  tooltip="Todos"
+                >
+                  <span>Todos</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {PILLARS.map((pillar) => {
                 const Icon = pillar.icon;
                 return (
-                  <Button
-                    key={pillar.id}
-                    variant={
-                      selectedPillar === pillar.id ? 'secondary' : 'ghost'
-                    }
-                    className="w-full justify-start text-xs"
-                    onClick={() => setSelectedPillar(pillar.id as 'career' | 'social' | 'hobby')}
-                  >
-                    <Icon className="mr-2 h-3 w-3" />
-                    {pillar.label}
-                  </Button>
+                  <SidebarMenuItem key={pillar.id}>
+                    <SidebarMenuButton
+                      onClick={() => setSelectedPillar(pillar.id as 'career' | 'social' | 'hobby')}
+                      isActive={selectedPillar === pillar.id}
+                      tooltip={pillar.label}
+                    >
+                      <Icon />
+                      <span>{pillar.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 );
               })}
-            </div>
-          </div>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          <Separator className="my-4" />
-
-          {/* Recent Notes */}
-          <div className="px-4 pb-4">
-            <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase">
-              Recientes
-            </h3>
-            <div className="space-y-1">
+        {/* Recent Notes */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Recientes</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
               {recentNotes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {UI_MESSAGES.NO_RECENT_NOTES}
-                </p>
+                <SidebarMenuItem>
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    {UI_MESSAGES.NO_RECENT_NOTES}
+                  </div>
+                </SidebarMenuItem>
               ) : (
                 recentNotes.map((note) => (
-                  <Button
-                    key={note.id}
-                    variant="ghost"
-                    className="w-full justify-start text-xs h-auto py-1.5"
-                    onClick={() => {
-                      setCurrentNote(note);
-                      setViewMode('note');
-                    }}
-                  >
-                    <FileText className="mr-2 h-3 w-3" />
-                    <span className="truncate">{note.title}</span>
-                  </Button>
+                  <SidebarMenuItem key={note.id}>
+                    <SidebarMenuButton
+                      onClick={() => {
+                        setCurrentNote(note);
+                        setViewMode('note');
+                      }}
+                      tooltip={note.title}
+                    >
+                      <FileText />
+                      <span className="truncate">{note.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 ))
               )}
-            </div>
-          </div>
-        </ScrollArea>
-      </div>
-
-      <Separator />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
       {/* Footer Actions */}
-      <div className="p-4 space-y-2">
-        <Button
-          className="w-full"
-          onClick={handleCreateNote}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Nota
-        </Button>
-        <Button variant="ghost" className="w-full justify-start">
-          <Settings className="mr-2 h-4 w-4" />
-          Configuración
-        </Button>
-      </div>
-    </div>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleCreateNote} size="lg" tooltip="Nueva Nota">
+              <Plus />
+              <span>Nueva Nota</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Configuración">
+              <Settings />
+              <span>Configuración</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
-

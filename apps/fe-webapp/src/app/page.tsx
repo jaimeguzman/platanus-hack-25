@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Sidebar } from '@/components/sidebar/Sidebar';
+import { AppSidebar } from '@/components/sidebar/Sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { NoteEditor } from '@/components/editor/NoteEditor';
 import { GraphView } from '@/components/graph/GraphView';
@@ -90,23 +91,28 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden relative">
-        {renderMainContent()}
-        {!showVoiceRecorder && (
-          <FloatingActionButton
-            onNewNote={handleNewNote}
-            onNewVoiceNote={handleNewVoiceNote}
-          />
-        )}
-        {showVoiceRecorder && (
-          <VoiceNoteRecorder
-            onSave={handleVoiceNoteSave}
-            onCancel={handleVoiceNoteCancel}
-          />
-        )}
-      </main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset className="flex flex-col">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 z-10 bg-background">
+          <SidebarTrigger className="-ml-1" />
+        </header>
+        <main className="flex-1 overflow-hidden relative">
+          {renderMainContent()}
+          {showVoiceRecorder && (
+            <VoiceNoteRecorder
+              onSave={handleVoiceNoteSave}
+              onCancel={handleVoiceNoteCancel}
+            />
+          )}
+        </main>
+      </SidebarInset>
+      {!showVoiceRecorder && (
+        <FloatingActionButton
+          onNewNote={handleNewNote}
+          onNewVoiceNote={handleNewVoiceNote}
+        />
+      )}
+    </SidebarProvider>
   );
 }
