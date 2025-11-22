@@ -44,4 +44,4 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
           AWS_REGION: 'us-west-2'
         run: |
-          aws lambda update-function-code --function-name api-rag-memory --zip-file fileb://rag_memory.zip --region us-west-2
+          aws lambda update-function-code --function-name lambdaFunction --zip-file fileb://rag_memory.zip --region us-west-2
