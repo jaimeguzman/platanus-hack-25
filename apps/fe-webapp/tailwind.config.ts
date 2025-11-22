@@ -1,7 +1,8 @@
 import type { Config } from 'tailwindcss';
+import typography from '@tailwindcss/typography';
 
 const config: Config = {
-  darkMode: 'class',
+  darkMode: ['class'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -10,59 +11,49 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        background: 'hsl(0, 0%, 100%)',
+        foreground: 'hsl(222.2, 84%, 4.9%)',
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: 'hsl(0, 0%, 100%)',
+          foreground: 'hsl(222.2, 84%, 4.9%)',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: 'hsl(0, 0%, 100%)',
+          foreground: 'hsl(222.2, 84%, 4.9%)',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: 'hsl(222.2, 47.4%, 11.2%)',
+          foreground: 'hsl(210, 40%, 98%)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: 'hsl(210, 40%, 96.1%)',
+          foreground: 'hsl(222.2, 47.4%, 11.2%)',
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'hsl(210, 40%, 96.1%)',
+          foreground: 'hsl(215.4, 16.3%, 46.9%)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'hsl(210, 40%, 96.1%)',
+          foreground: 'hsl(222.2, 47.4%, 11.2%)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: 'hsl(0, 84.2%, 60.2%)',
+          foreground: 'hsl(210, 40%, 98%)',
         },
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        sidebar: {
-          DEFAULT: 'hsl(var(--sidebar))',
-          foreground: 'hsl(var(--sidebar-foreground))',
-          border: 'hsl(var(--sidebar-border))',
-          accent: 'hsl(var(--sidebar-accent))',
-          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-        },
+        border: 'hsl(214.3, 31.8%, 91.4%)',
+        input: 'hsl(214.3, 31.8%, 91.4%)',
+        ring: 'hsl(222.2, 84%, 4.9%)',
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
-      },
-      fontFamily: {
-        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular'],
+        lg: '0.5rem',
+        md: 'calc(0.5rem - 2px)',
+        sm: 'calc(0.5rem - 4px)',
       },
     },
   },
-  plugins: [],
+  plugins: [typography],
 };
 
 export default config;
+

@@ -1,149 +1,226 @@
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import type { Note } from '@/types/note';
-import type { Database } from '@/types/supabase';
+import { NoteServiceError, ERROR_CODES } from '@/lib/errors';
 
-type NoteUpdate = Database['public']['Tables']['notes']['Update'];
+const NOTES_TABLE = 'notes';
 
-export interface CreateNoteParams {
-  userId: string;
-  title: string;
-  content: string;
-  projectId?: string | null;
-  isPinned?: boolean;
-  tags?: string[];
+export async function fetchNotes(): Promise<Note[]> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from(NOTES_TABLE)
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new NoteServiceError(
+        `Failed to fetch notes: ${error.message}`,
+        ERROR_CODES.FETCH_FAILED,
+      );
+    }
+
+    if (!data) {
+      throw new NoteServiceError(
+        'No data returned from database',
+        ERROR_CODES.FETCH_FAILED,
+      );
+    }
+
+    return data.map(mapDbNoteToNote);
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    throw error;
+  }
 }
 
-export const noteService = {
-  async createNote(params: CreateNoteParams): Promise<Note> {
-    const { userId, title, content, projectId, isPinned = false, tags = [] } = params;
-
-    const { data: noteData, error: noteError } = await supabase
-      .from('notes')
+export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
+  try {
+    const supabase = getSupabaseClient();
+    const now = new Date().toISOString();
+    
+    const linkedNotes = note.linkedNotes ?? [];
+    const isFavorite = note.isFavorite ?? false;
+    
+    const { data, error } = await supabase
+      .from(NOTES_TABLE)
       .insert({
-        user_id: userId,
-        title,
-        content,
-        project_id: projectId || null,
-        is_pinned: isPinned,
-      })
+        title: note.title,
+        content: note.content,
+        tags: note.tags,
+        pillar: note.pillar,
+        is_favorite: isFavorite,
+        linked_notes: linkedNotes,
+        created_at: now,
+        updated_at: now,
+      } as never)
       .select()
       .single();
 
-    if (noteError) throw noteError;
-
-    if (tags.length > 0) {
-      for (const tagName of tags) {
-        let tagId: string;
-
-        const { data: existingTag } = await supabase
-          .from('tags')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', tagName)
-          .single();
-
-        if (existingTag) {
-          tagId = existingTag.id;
-        } else {
-          const { data: newTag, error: tagError } = await supabase
-            .from('tags')
-            .insert({ user_id: userId, name: tagName })
-            .select('id')
-            .single();
-
-          if (tagError) throw tagError;
-          tagId = newTag.id;
-        }
-
-        const { error: noteTagError } = await supabase
-          .from('note_tags')
-          .insert({ note_id: noteData.id, tag_id: tagId });
-
-        if (noteTagError) throw noteTagError;
-      }
+    if (error) {
+      throw new NoteServiceError(
+        `Failed to create note: ${error.message}`,
+        ERROR_CODES.CREATE_FAILED,
+      );
     }
 
-    return {
-      id: noteData.id,
-      title: noteData.title,
-      content: noteData.content,
-      tags,
-      createdAt: new Date(noteData.created_at!),
-      updatedAt: new Date(noteData.updated_at!),
-      projectId: noteData.project_id || undefined,
-      isPinned: noteData.is_pinned || false,
-      backlinks: [],
-    };
-  },
+    if (!data) {
+      throw new NoteServiceError(
+        'No data returned after creating note',
+        ERROR_CODES.CREATE_FAILED,
+      );
+    }
 
-  async updateNote(noteId: string, updates: Partial<Note>): Promise<Note> {
-    const updateData: NoteUpdate = {};
+    return mapDbNoteToNote(data);
+  } catch (error) {
+    console.error('Error creating note:', error);
+    throw error;
+  }
+}
+
+export async function updateNote(id: string, updates: Partial<Note>): Promise<Note> {
+  try {
+    const supabase = getSupabaseClient();
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
 
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.content !== undefined) updateData.content = updates.content;
-    if (updates.isPinned !== undefined) updateData.is_pinned = updates.isPinned;
-    if (updates.projectId !== undefined) updateData.project_id = updates.projectId || null;
+    if (updates.tags !== undefined) updateData.tags = updates.tags;
+    if (updates.pillar !== undefined) updateData.pillar = updates.pillar;
+    if (updates.isFavorite !== undefined) updateData.is_favorite = updates.isFavorite;
+    if (updates.linkedNotes !== undefined) {
+      updateData.linked_notes = updates.linkedNotes ?? [];
+    }
 
     const { data, error } = await supabase
-      .from('notes')
-      .update(updateData)
-      .eq('id', noteId)
+      .from(NOTES_TABLE)
+      .update(updateData as never)
+      .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw new NoteServiceError(
+        `Failed to update note: ${error.message}`,
+        ERROR_CODES.UPDATE_FAILED,
+      );
+    }
 
-    const { data: tagsData } = await supabase
-      .from('note_tags')
-      .select('tags(name)')
-      .eq('note_id', noteId);
+    if (!data) {
+      throw new NoteServiceError(
+        `Note with id ${id} not found`,
+        ERROR_CODES.NOT_FOUND,
+      );
+    }
 
-    const tags = tagsData?.map((item) => (item as { tags: { name: string } }).tags?.name).filter(Boolean) || [];
+    return mapDbNoteToNote(data);
+  } catch (error) {
+    console.error('Error updating note:', error);
+    throw error;
+  }
+}
 
-    return {
-      id: data.id,
-      title: data.title,
-      content: data.content,
-      tags,
-      createdAt: new Date(data.created_at!),
-      updatedAt: new Date(data.updated_at!),
-      projectId: data.project_id || undefined,
-      isPinned: data.is_pinned || false,
-      backlinks: [],
-    };
-  },
-
-  async deleteNote(noteId: string): Promise<void> {
+export async function deleteNote(id: string): Promise<boolean> {
+  try {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
-      .from('notes')
+      .from(NOTES_TABLE)
       .delete()
-      .eq('id', noteId);
+      .eq('id', id);
 
-    if (error) throw error;
-  },
+    if (error) {
+      throw error;
+    }
 
-  async getNotesByUserId(userId: string): Promise<Note[]> {
+    return true;
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    return false;
+  }
+}
+
+export async function fetchFavoriteNotes(): Promise<Note[]> {
+  try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from('notes')
-      .select(`
-        *,
-        note_tags(tags(name))
-      `)
-      .eq('user_id', userId)
+      .from(NOTES_TABLE)
+      .select('*')
+      .eq('is_favorite', true)
       .order('updated_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw new NoteServiceError(
+        `Failed to fetch favorite notes: ${error.message}`,
+        ERROR_CODES.FETCH_FAILED,
+      );
+    }
 
-    return data.map((note) => ({
-      id: note.id,
-      title: note.title,
-      content: note.content,
-      tags: (note.note_tags as Array<{ tags: { name: string } }>)?.map((nt) => nt.tags?.name).filter(Boolean) || [],
-      createdAt: new Date(note.created_at!),
-      updatedAt: new Date(note.updated_at!),
-      projectId: note.project_id || undefined,
-      isPinned: note.is_pinned || false,
-      backlinks: [],
-    }));
-  },
-};
+    if (!data) {
+      throw new NoteServiceError(
+        'No data returned from database',
+        ERROR_CODES.FETCH_FAILED,
+      );
+    }
+
+    return data.map(mapDbNoteToNote);
+  } catch (error) {
+    console.error('Error fetching favorite notes:', error);
+    throw error;
+  }
+}
+
+export async function toggleNoteFavorite(id: string, isFavorite: boolean): Promise<Note> {
+  return updateNote(id, { isFavorite });
+}
+
+export async function searchNotes(query: string): Promise<Note[]> {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from(NOTES_TABLE)
+      .select('*')
+      .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new NoteServiceError(
+        `Failed to search notes: ${error.message}`,
+        ERROR_CODES.SEARCH_FAILED,
+      );
+    }
+
+    if (!data) {
+      throw new NoteServiceError(
+        'No data returned from search',
+        ERROR_CODES.SEARCH_FAILED,
+      );
+    }
+
+    return data.map(mapDbNoteToNote);
+  } catch (error) {
+    console.error('Error searching notes:', error);
+    throw error;
+  }
+}
+
+function mapDbNoteToNote(dbNote: Record<string, unknown>): Note {
+  const tags = Array.isArray(dbNote.tags) ? (dbNote.tags as string[]) : [];
+  const linkedNotes = Array.isArray(dbNote.linked_notes)
+    ? (dbNote.linked_notes as string[])
+    : [];
+  const isFavorite = typeof dbNote.is_favorite === 'boolean' ? dbNote.is_favorite : false;
+
+  return {
+    id: dbNote.id as string,
+    title: dbNote.title as string,
+    content: dbNote.content as string,
+    tags,
+    pillar: dbNote.pillar as 'career' | 'social' | 'hobby',
+    isFavorite,
+    createdAt: dbNote.created_at as string,
+    updatedAt: dbNote.updated_at as string,
+    linkedNotes,
+  };
+}
+

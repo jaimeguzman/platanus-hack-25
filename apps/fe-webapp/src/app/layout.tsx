@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from '@/components/theme/ThemeProvider';
-import { UserProvider } from '@/contexts/UserContext';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SecondBrain - Personal Knowledge Manager',
-  description: 'Your AI-powered personal knowledge management system',
+  title: 'Segundo Cerebro - PKM',
+  description: 'Sistema de gestión de conocimiento personal',
 };
 
 export default function RootLayout({
@@ -14,14 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
-      <body className="antialiased">
-        <ThemeProvider>
-          <UserProvider>
-            {children}
-          </UserProvider>
-        </ThemeProvider>
-      </body>
+    <html lang="es">
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
+
