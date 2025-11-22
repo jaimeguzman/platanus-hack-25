@@ -13,7 +13,7 @@ CREATE TABLE memory (
     
     -- Optional metadata fields
     category    VARCHAR(100),
-    source      VARCHAR(255),
+    source      TEXT,
     
     -- Timestamps
     created_at  TIMESTAMPTZ DEFAULT NOW(),
