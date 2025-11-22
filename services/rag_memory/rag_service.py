@@ -156,22 +156,37 @@ class RagMemoryService:
                 if similarity_score < self.similarity_threshold:
                     continue
 
-                # Create bidirectional edges in database
-                edge_forward = MemoryEdge(
-                    source_id=memory.id,
-                    target_id=sim.id,
-                    weight=similarity_score,
-                )
-                edge_backward = MemoryEdge(
-                    source_id=sim.id,
-                    target_id=memory.id,
-                    weight=similarity_score,
-                )
+                # Check if edges already exist
+                existing_forward = session.get(MemoryEdge, (memory.id, sim.id))
+                existing_backward = session.get(MemoryEdge, (sim.id, memory.id))
                 
-                session.merge(edge_forward)
-                session.merge(edge_backward)
+                if existing_forward:
+                    # Update existing edge weight
+                    existing_forward.weight = similarity_score
+                    logger.debug(f"Updated edge {memory.id} -> {sim.id}")
+                else:
+                    # Create new forward edge
+                    edge_forward = MemoryEdge(
+                        source_id=memory.id,
+                        target_id=sim.id,
+                        weight=similarity_score,
+                    )
+                    session.add(edge_forward)
                 
-                # Add to in-memory graph
+                if existing_backward:
+                    # Update existing edge weight
+                    existing_backward.weight = similarity_score
+                    logger.debug(f"Updated edge {sim.id} -> {memory.id}")
+                else:
+                    # Create new backward edge
+                    edge_backward = MemoryEdge(
+                        source_id=sim.id,
+                        target_id=memory.id,
+                        weight=similarity_score,
+                    )
+                    session.add(edge_backward)
+                
+                # Add/update in-memory graph
                 self.graph_store.add_similarity_edge(
                     memory.id,
                     sim.id,
@@ -258,7 +273,10 @@ class RagMemoryService:
             
             logger.info(f"Created {len(memories)} memories in batch")
             
-            # Connect similar memories (this could be optimized further)
+            # Connect similar memories
+            # Track edges created in this batch to avoid duplicates
+            edges_in_batch = set()
+            
             for memory in memories:
                 similar_memories = self._get_similar_memories_by_embedding(
                     session=session,
@@ -276,20 +294,45 @@ class RagMemoryService:
                     if similarity_score < self.similarity_threshold:
                         continue
                     
-                    edge_forward = MemoryEdge(
-                        source_id=memory.id,
-                        target_id=sim.id,
-                        weight=similarity_score,
-                    )
-                    edge_backward = MemoryEdge(
-                        source_id=sim.id,
-                        target_id=memory.id,
-                        weight=similarity_score,
-                    )
+                    # Create edge keys for tracking
+                    edge_forward_key = (memory.id, sim.id)
+                    edge_backward_key = (sim.id, memory.id)
                     
-                    session.merge(edge_forward)
-                    session.merge(edge_backward)
+                    # Check if edges already exist in DB
+                    existing_forward = session.get(MemoryEdge, edge_forward_key)
+                    existing_backward = session.get(MemoryEdge, edge_backward_key)
                     
+                    # Handle forward edge
+                    if existing_forward:
+                        # Update existing edge weight
+                        existing_forward.weight = similarity_score
+                        edges_in_batch.add(edge_forward_key)
+                    elif edge_forward_key not in edges_in_batch:
+                        # Create new forward edge only if not already created in this batch
+                        edge_forward = MemoryEdge(
+                            source_id=memory.id,
+                            target_id=sim.id,
+                            weight=similarity_score,
+                        )
+                        session.add(edge_forward)
+                        edges_in_batch.add(edge_forward_key)
+                    
+                    # Handle backward edge
+                    if existing_backward:
+                        # Update existing edge weight
+                        existing_backward.weight = similarity_score
+                        edges_in_batch.add(edge_backward_key)
+                    elif edge_backward_key not in edges_in_batch:
+                        # Create new backward edge only if not already created in this batch
+                        edge_backward = MemoryEdge(
+                            source_id=sim.id,
+                            target_id=memory.id,
+                            weight=similarity_score,
+                        )
+                        session.add(edge_backward)
+                        edges_in_batch.add(edge_backward_key)
+                    
+                    # Add/update in-memory graph
                     self.graph_store.add_similarity_edge(
                         memory.id,
                         sim.id,
@@ -446,19 +489,33 @@ class RagMemoryService:
                     if similarity_score < self.similarity_threshold:
                         continue
                     
-                    edge_forward = MemoryEdge(
-                        source_id=memory_id,
-                        target_id=sim.id,
-                        weight=similarity_score,
-                    )
-                    edge_backward = MemoryEdge(
-                        source_id=sim.id,
-                        target_id=memory_id,
-                        weight=similarity_score,
-                    )
+                    # Check if edges already exist
+                    existing_forward = session.get(MemoryEdge, (memory_id, sim.id))
+                    existing_backward = session.get(MemoryEdge, (sim.id, memory_id))
                     
-                    session.merge(edge_forward)
-                    session.merge(edge_backward)
+                    if existing_forward:
+                        # Update existing edge weight
+                        existing_forward.weight = similarity_score
+                    else:
+                        # Create new forward edge
+                        edge_forward = MemoryEdge(
+                            source_id=memory_id,
+                            target_id=sim.id,
+                            weight=similarity_score,
+                        )
+                        session.add(edge_forward)
+                    
+                    if existing_backward:
+                        # Update existing edge weight
+                        existing_backward.weight = similarity_score
+                    else:
+                        # Create new backward edge
+                        edge_backward = MemoryEdge(
+                            source_id=sim.id,
+                            target_id=memory_id,
+                            weight=similarity_score,
+                        )
+                        session.add(edge_backward)
             
             session.commit()
             session.refresh(memory)
@@ -867,14 +924,22 @@ class RagMemoryService:
                 .order_by(MemoryEdge.weight.desc())
             ).all()
 
-            edges = [
-                {
-                    "source": row.source_id,
-                    "target": row.target_id,
-                    "weight": row.weight,
-                }
-                for row in edges_rows
-            ]
+            # Filter duplicate edges (keep only one direction per pair)
+            # Since edges are bidirectional, we only need source_id < target_id
+            seen_pairs = set()
+            edges = []
+            
+            for row in edges_rows:
+                # Create a normalized pair (smaller id first)
+                pair = tuple(sorted([row.source_id, row.target_id]))
+                
+                if pair not in seen_pairs:
+                    seen_pairs.add(pair)
+                    edges.append({
+                        "source": row.source_id,
+                        "target": row.target_id,
+                        "weight": row.weight,
+                    })
 
             logger.info(f"Exported graph: {len(nodes)} nodes, {len(edges)} edges")
 
