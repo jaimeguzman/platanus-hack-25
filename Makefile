@@ -10,7 +10,7 @@ help:
 	@echo "  make clean     - Limpiar contenedores y volúmenes"
 
 up:
-	docker-compose up -d
+	docker-compose up
 
 down:
 	docker-compose down
