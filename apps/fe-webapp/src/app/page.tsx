@@ -5,7 +5,7 @@ import { AppSidebar } from '@/components/sidebar/Sidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { NoteEditor } from '@/components/editor/NoteEditor';
-import { GraphView } from '@/components/graph/GraphView';
+import GraphView from '@/components/graph/GraphView';
 import { FloatingActionButton } from '@/components/ui/floating-action-button';
 import { VoiceNoteRecorder } from '@/components/voice-note/VoiceNoteRecorder';
 import { useNoteStore } from '@/stores/noteStore';
