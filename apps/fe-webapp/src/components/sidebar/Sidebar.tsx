@@ -13,8 +13,7 @@ import {
   Folder,
   Home,
   ChevronRight,
-  ChevronDown,
-  BookOpen
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,20 +22,18 @@ import { SPACING } from '@/constants/spacing';
 import { DEFAULT_VALUES, NUMERIC_CONSTANTS } from '@/constants/mockData';
 
 const Sidebar: React.FC = () => {
-  const { 
-    projects, 
-    selectedProjectId, 
+  const {
+    projects,
+    selectedProjectId,
     setSelectedProject,
     getFilteredNotes,
     setActiveNote,
-    addNote,
-    getRecentNotes
+    addNote
   } = usePKMStore();
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [sidebarSearch, setSidebarSearch] = useState('');
   const filteredNotes = getFilteredNotes();
-  const recentNotes = getRecentNotes();
 
   const toggleProject = (projectId: string) => {
     const newExpanded = new Set(expandedProjects);
@@ -52,7 +49,7 @@ const Sidebar: React.FC = () => {
     const newNoteId = addNote({
       title: DEFAULT_VALUES.note.title,
       content: DEFAULT_VALUES.note.content,
-      tags: DEFAULT_VALUES.note.tags,
+      tags: [...DEFAULT_VALUES.note.tags],
       projectId: selectedProjectId ?? undefined
     });
     setActiveNote(newNoteId);

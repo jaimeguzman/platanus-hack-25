@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { Note, Project } from '../types/note';
-import { MOCK_PROJECTS, DEFAULT_VALUES, FALLBACK_VALUES, NUMERIC_CONSTANTS } from '../constants/mockData';
+import { MOCK_PROJECTS, FALLBACK_VALUES, NUMERIC_CONSTANTS } from '../constants/mockData';
 
 interface PKMState {
   // Notes

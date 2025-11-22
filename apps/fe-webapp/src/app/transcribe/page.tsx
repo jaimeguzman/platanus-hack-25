@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2, CheckCircle, XCircle, Mic, Square, Play } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, XCircle, Mic, Square } from 'lucide-react';
 
 export default function TranscribePage() {
   const [file, setFile] = useState<File | null>(null);
