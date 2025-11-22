@@ -44,5 +44,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "overrides": {
+    "@ai-sdk/provider": "0.0.26"
   }
 }

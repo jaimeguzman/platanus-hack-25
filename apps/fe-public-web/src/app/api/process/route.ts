@@ -139,7 +139,7 @@ export async function POST(req: Request) {
           'Guardar el texto del usuario como una nueva memoria persistente.',
         // gpt-5 exige que "required" incluya todas las keys en properties.
         // Hacemos ambas requeridas para cumplir con el validador del modelo.
-        inputSchema: z.object({
+        parameters: z.object({
           category: z.string(),
           source: z.string(),
         }),
@@ -148,7 +148,7 @@ export async function POST(req: Request) {
         description:
           'Responder a la consulta del usuario usando RAG y devolver respuesta breve.',
         // También requerimos needs_citation para cumplir con el validador.
-        inputSchema: z.object({
+        parameters: z.object({
           needs_citation: z.boolean(),
         }),
       },
