@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'services/rag_memory/**'
-      - '.github/workflows/deploy.yaml'
+      - '.github/workflows/deploy-lambda.yml'
 
 permissions:
   contents: read
