@@ -10,7 +10,6 @@ import {
   Briefcase,
   Users,
   Heart,
-  Plus,
   Star,
   Brain,
 } from 'lucide-react';
@@ -29,7 +28,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
-import { EMPTY_NOTE } from '@/data/mockData';
 
 const PILLARS = [
   { id: 'career', label: 'Desarrollo de Carrera', icon: Briefcase },
@@ -56,26 +54,6 @@ export function AppSidebar() {
   const recentNotes = notes
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, APP_CONFIG.RECENT_NOTES_LIMIT);
-
-  const handleCreateNote = () => {
-    const now = new Date().toISOString();
-    const pillar = selectedPillar === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedPillar;
-    
-    const newNote = {
-      id: `note-${Date.now()}`,
-      title: UI_MESSAGES.NEW_NOTE_TITLE,
-      content: EMPTY_NOTE.content,
-      tags: EMPTY_NOTE.tags,
-      pillar,
-      createdAt: now,
-      updatedAt: now,
-      linkedNotes: EMPTY_NOTE.linkedNotes,
-      isFavorite: EMPTY_NOTE.isFavorite,
-    };
-    useNoteStore.getState().addNote(newNote);
-    setCurrentNote(newNote);
-    setViewMode('note');
-  };
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -231,12 +209,6 @@ export function AppSidebar() {
       {/* Footer Actions */}
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleCreateNote} size="lg" tooltip="Nueva Nota">
-              <Plus />
-              <span>Nueva Nota</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Configuración">
               <Settings />
