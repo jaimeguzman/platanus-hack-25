@@ -58,11 +58,19 @@ export function GraphView() {
 
   // Generar nodos y conexiones basadas en tags y referencias
   const { nodes, links } = useMemo(() => {
+    // Usar dimensiones por defecto para la distribución inicial
+    // Se ajustarán dinámicamente cuando se monte el componente
+    const defaultWidth = APP_CONFIG.GRAPH_VIEWBOX_WIDTH;
+    const defaultHeight = APP_CONFIG.GRAPH_VIEWBOX_HEIGHT;
+    const centerX = defaultWidth / 2;
+    const centerY = defaultHeight / 2;
+    const radius = Math.min(defaultWidth, defaultHeight) * 0.3; // 30% del tamaño menor
+    
     const graphNodes: GraphNode[] = notes.map((note, index) => {
       // Distribución circular inicial para mejor visualización
       const angle = (index / notes.length) * D3_SIMULATION.FULL_CIRCLE_RADIANS;
-      const x = Math.cos(angle) * APP_CONFIG.GRAPH_RADIUS + APP_CONFIG.GRAPH_CENTER_X;
-      const y = Math.sin(angle) * APP_CONFIG.GRAPH_RADIUS + APP_CONFIG.GRAPH_CENTER_Y;
+      const x = Math.cos(angle) * radius + centerX;
+      const y = Math.sin(angle) * radius + centerY;
 
       return {
         id: note.id,
@@ -108,11 +116,16 @@ export function GraphView() {
 
   // Inicializar y actualizar la simulación de D3
   useEffect(() => {
-    if (!svgRef.current || nodes.length === 0) return;
+    if (!svgRef.current || !containerRef.current || nodes.length === 0) return;
 
     const svg = d3.select(svgRef.current);
-    const width = APP_CONFIG.GRAPH_VIEWBOX_WIDTH;
-    const height = APP_CONFIG.GRAPH_VIEWBOX_HEIGHT;
+    // Obtener dimensiones reales del contenedor
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const width = containerRect.width || APP_CONFIG.GRAPH_VIEWBOX_WIDTH;
+    const height = containerRect.height || APP_CONFIG.GRAPH_VIEWBOX_HEIGHT;
+    
+    // Actualizar viewBox para que coincida con las dimensiones del contenedor
+    svg.attr('viewBox', `0 0 ${width} ${height}`);
 
     // Limpiar elementos anteriores
     svg.selectAll('*').remove();
@@ -147,8 +160,8 @@ export function GraphView() {
         'center',
         d3
           .forceCenter(
-            width * APP_CONFIG.FORCE_CENTER_X,
-            height * APP_CONFIG.FORCE_CENTER_Y,
+            width / 2,
+            height / 2,
           )
           .strength(D3_SIMULATION.CENTER_FORCE_STRENGTH),
       )
@@ -214,9 +227,9 @@ export function GraphView() {
     
     // Aplicar zoom inicial centrado
     const initialTransform = d3.zoomIdentity
-      .translate(width * D3_ZOOM.CENTER_TRANSLATE_FACTOR, height * D3_ZOOM.CENTER_TRANSLATE_FACTOR)
+      .translate(width / 2, height / 2)
       .scale(APP_CONFIG.ZOOM_INITIAL_SCALE)
-      .translate(-width * D3_ZOOM.CENTER_TRANSLATE_FACTOR, -height * D3_ZOOM.CENTER_TRANSLATE_FACTOR);
+      .translate(-width / 2, -height / 2);
     
     svg.call(zoom.transform, initialTransform);
 
@@ -314,6 +327,35 @@ export function GraphView() {
     };
   }, [nodes, links, interactionMode, isDarkMode]);
 
+  // Actualizar viewBox cuando cambia el tamaño del contenedor
+  useEffect(() => {
+    const updateViewBox = () => {
+      if (!svgRef.current || !containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      if (containerRect.width > 0 && containerRect.height > 0) {
+        const svg = d3.select(svgRef.current);
+        svg.attr('viewBox', `0 0 ${containerRect.width} ${containerRect.height}`);
+      }
+    };
+
+    const handleResize = () => {
+      updateViewBox();
+    };
+
+    // Usar ResizeObserver para detectar cambios en el tamaño del contenedor
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // Ejecutar una vez al montar con un pequeño delay para asegurar que el DOM esté listo
+    setTimeout(updateViewBox, 100);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Manejar cambios de modo y actualizar zoom
   useEffect(() => {
     if (!svgRef.current || !zoomRef.current) return;
@@ -349,14 +391,15 @@ export function GraphView() {
   };
 
   const handleResetZoom = () => {
-    if (!svgRef.current || !zoomRef.current) return;
+    if (!svgRef.current || !zoomRef.current || !containerRef.current) return;
     const svg = d3.select(svgRef.current);
-    const width = APP_CONFIG.GRAPH_VIEWBOX_WIDTH;
-    const height = APP_CONFIG.GRAPH_VIEWBOX_HEIGHT;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const width = containerRect.width || APP_CONFIG.GRAPH_VIEWBOX_WIDTH;
+    const height = containerRect.height || APP_CONFIG.GRAPH_VIEWBOX_HEIGHT;
     const initialTransform = d3.zoomIdentity
-      .translate(width * D3_ZOOM.CENTER_TRANSLATE_FACTOR, height * D3_ZOOM.CENTER_TRANSLATE_FACTOR)
+      .translate(width / 2, height / 2)
       .scale(APP_CONFIG.ZOOM_INITIAL_SCALE)
-      .translate(-width * D3_ZOOM.CENTER_TRANSLATE_FACTOR, -height * D3_ZOOM.CENTER_TRANSLATE_FACTOR);
+      .translate(-width / 2, -height / 2);
     
     svg.transition().duration(ANIMATION_DURATION.ZOOM_RESET).call(
       zoomRef.current.transform,
@@ -443,8 +486,8 @@ export function GraphView() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+    <div className="flex h-full flex-col overflow-hidden min-h-0">
+      <div className="border-b p-4 shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Graph View</h2>
@@ -520,7 +563,7 @@ export function GraphView() {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative flex-1 overflow-hidden bg-muted/30 dark:bg-muted/20">
+      <div ref={containerRef} className="relative flex-1 overflow-hidden bg-muted/30 dark:bg-muted/20 min-h-0">
         <svg
           ref={svgRef}
           className="h-full w-full"
@@ -528,8 +571,8 @@ export function GraphView() {
           preserveAspectRatio="xMidYMid meet"
         />
 
-        {/* Legend */}
-        <div className="absolute bottom-4 left-4 rounded-lg border bg-card p-3 shadow-sm">
+        {/* Legend - Ajustado para no salirse de la pantalla */}
+        <div className="absolute bottom-4 left-4 max-h-[calc(100%-8rem)] overflow-y-auto rounded-lg border bg-card p-3 shadow-sm">
           <h3 className="mb-2 text-sm font-semibold">Leyenda</h3>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
@@ -547,8 +590,8 @@ export function GraphView() {
           </div>
         </div>
 
-        {/* Node list */}
-        <div className="absolute right-4 top-4 max-h-96 w-64 overflow-auto rounded-lg border bg-card p-4 shadow-sm">
+        {/* Node list - Ajustado para no salirse de la pantalla */}
+        <div className="absolute right-4 top-4 max-h-[calc(100%-2rem)] w-64 overflow-y-auto rounded-lg border bg-card p-4 shadow-sm">
           <h3 className="mb-2 text-sm font-semibold">Notas ({nodes.length})</h3>
           <div className="space-y-1">
             {nodes.map((node) => (
