@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { SPACING } from '@/constants/spacing';
 import { DEFAULT_VALUES, FALLBACK_VALUES } from '@/constants/mockData';
@@ -53,15 +53,15 @@ export default function Home() {
         e.preventDefault();
         setViewMode('editor');
       }
-      // Ctrl/Cmd + 2: Graph view
+      // Ctrl/Cmd + 2: Split view (Visor)
       if ((e.ctrlKey || e.metaKey) && e.key === '2') {
         e.preventDefault();
-        setViewMode('graph');
+        setViewMode('split');
       }
-      // Ctrl/Cmd + 3: Split view
+      // Ctrl/Cmd + 3: Full graph view
       if ((e.ctrlKey || e.metaKey) && e.key === '3') {
         e.preventDefault();
-        setViewMode('split');
+        setViewMode('graph');
       }
     };
 
@@ -162,149 +162,52 @@ export default function Home() {
             {/* Mostrar Nuevo y Audio solo cuando NO estamos en vista de grafo */}
             {viewMode === 'editor' && (
               <>
-                <Button
+                <button
                   onClick={handleNewNote}
-                  variant="ghost"
-                  size="sm"
                   aria-label="Crear nueva nota"
                   title="Crear nueva nota (Ctrl+N)"
-                  className={cn(
-                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                    SPACING.button.sm.height,
-                    SPACING.button.sm.paddingX,
-                    SPACING.button.sm.fontSize
-                  )}
+                  className="text-sm font-medium text-muted-foreground hover:text-violet-500 underline underline-offset-4 decoration-transparent hover:decoration-violet-500 transition-all duration-200"
                 >
                   Nueva nota
-                </Button>
-                <Button
+                </button>
+                <span className="text-muted-foreground/50">|</span>
+                <button
                   onClick={() => setShowAudioTranscriber(true)}
-                  variant="ghost"
-                  size="sm"
                   aria-label="Abrir transcriptor de audio"
                   title="Transcribir audio a texto"
-                  className={cn(
-                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                    SPACING.button.sm.height,
-                    SPACING.button.sm.paddingX,
-                    SPACING.button.sm.fontSize
-                  )}
+                  className="text-sm font-medium text-muted-foreground hover:text-violet-500 underline underline-offset-4 decoration-transparent hover:decoration-violet-500 transition-all duration-200"
                 >
                   Nuevo audio
-                </Button>
-                <div
-                  className={cn(
-                    'bg-border',
-                    SPACING.separator.height,
-                    SPACING.separator.width,
-                    SPACING.separator.marginX
-                  )}
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-hidden="true"
-                />
+                </button>
+                <div className="h-4 w-px bg-border mx-2" role="separator" aria-hidden="true" />
               </>
             )}
 
-            {/* Mostrar botón Salir cuando estamos en vista de grafo o dividida */}
-            {(viewMode === 'graph' || viewMode === 'split') && (
-              <>
-                <Button
-                  onClick={() => setViewMode('editor')}
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Salir del visor"
-                  title="Volver al editor"
-                  className={cn(
-                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                    SPACING.button.sm.height,
-                    SPACING.button.sm.paddingX,
-                    SPACING.button.sm.fontSize
-                  )}
-                >
-                  <X className="w-4 h-4 mr-1.5" />
-                  Salir
-                </Button>
-                <div
-                  className={cn(
-                    'bg-border',
-                    SPACING.separator.height,
-                    SPACING.separator.width,
-                    SPACING.separator.marginX
-                  )}
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-hidden="true"
-                />
-              </>
-            )}
 
-            <div
-              className={cn(
-                'flex items-center bg-card rounded-md border border-border',
-                SPACING.viewMode.container.padding,
-                SPACING.viewMode.container.gap
-              )}
-              role="group"
-              aria-label="Selector de vista"
-            >
-              <Button
+            {/* Toggle Editor / Visor */}
+            <div className="flex items-center bg-muted rounded-xl p-1 border border-border">
+              <button
                 onClick={() => setViewMode('editor')}
-                variant={viewMode === 'editor' ? 'default' : 'ghost'}
-                size="sm"
-                aria-label="Vista editor"
-                aria-pressed={viewMode === 'editor'}
-                title="Vista editor - Editar notas en markdown"
                 className={cn(
-                  'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-                  SPACING.viewMode.button.height,
-                  SPACING.viewMode.button.paddingX,
-                  SPACING.button.sm.fontSize,
+                  'w-20 py-2 text-sm font-medium rounded-lg transition-all duration-200',
                   viewMode === 'editor'
-                    ? 'bg-secondary text-foreground shadow-sm'
-                    : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
+                    ? 'bg-violet-500 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 Editor
-              </Button>
-              <Button
-                onClick={() => setViewMode('graph')}
-                variant={viewMode === 'graph' ? 'default' : 'ghost'}
-                size="sm"
-                aria-label="Visor gráfico"
-                aria-pressed={viewMode === 'graph'}
-                title="Visor gráfico - Visualizar conexiones entre notas"
+              </button>
+              <button
+                onClick={() => setViewMode(viewMode === 'split' || viewMode === 'graph' ? 'editor' : 'split')}
                 className={cn(
-                  'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-                  SPACING.viewMode.button.height,
-                  SPACING.viewMode.button.paddingX,
-                  SPACING.button.sm.fontSize,
-                  viewMode === 'graph'
-                    ? 'bg-secondary text-foreground shadow-sm'
-                    : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
+                  'w-20 py-2 text-sm font-medium rounded-lg transition-all duration-200',
+                  viewMode === 'split' || viewMode === 'graph'
+                    ? 'bg-violet-500 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                Visor
-              </Button>
-              <Button
-                onClick={() => setViewMode('split')}
-                variant={viewMode === 'split' ? 'default' : 'ghost'}
-                size="sm"
-                aria-label="Vista dividida"
-                aria-pressed={viewMode === 'split'}
-                title="Vista dividida - Editor y visor lado a lado"
-                className={cn(
-                  'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
-                  SPACING.viewMode.button.height,
-                  SPACING.viewMode.button.paddingX,
-                  SPACING.button.sm.fontSize,
-                  viewMode === 'split'
-                    ? 'bg-secondary text-foreground shadow-sm'
-                    : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                Dividir
-              </Button>
+                Dividido
+              </button>
             </div>
             <div
               className={cn(
@@ -322,15 +225,15 @@ export default function Home() {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 flex">
+        <main className="flex-1 flex min-h-0 overflow-hidden">
           {viewMode === 'editor' && <NoteEditor />}
           {viewMode === 'graph' && <GraphView />}
           {viewMode === 'split' && (
-            <div className="flex w-full">
-              <div className="w-1/2 border-r border-border">
+            <div className="flex w-full h-full">
+              <div className="w-1/2 border-r border-border flex flex-col overflow-hidden">
                 <NoteEditor />
               </div>
-              <div className="w-1/2">
+              <div className="w-1/2 flex flex-col overflow-hidden">
                 <GraphView />
               </div>
             </div>

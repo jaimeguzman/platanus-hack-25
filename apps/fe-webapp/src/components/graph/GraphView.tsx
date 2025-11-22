@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { usePKMStore } from '@/stores/pkmStore';
 import { GraphNode, GraphEdge } from '@/types/note';
-import { ZoomIn, ZoomOut, RotateCcw, Maximize } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Colores para el grafo
@@ -23,7 +23,7 @@ const GRAPH_COLORS = {
 const GraphView: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { notes, projects, setActiveNote, setViewMode } = usePKMStore();
+  const { notes, projects, setActiveNote, setViewMode, viewMode } = usePKMStore();
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [zoom, setZoom] = useState(1);
@@ -309,33 +309,6 @@ const GraphView: React.FC = () => {
     setOffset({ x: 0, y: 0 });
   };
 
-  // Ajustar vista para ver todos los nodos
-  const handleFitToScreen = () => {
-    if (nodes.length === 0) return;
-
-    const nodeXs = nodes.map(n => n.x || 0);
-    const nodeYs = nodes.map(n => n.y || 0);
-    const minX = Math.min(...nodeXs) - 50;
-    const maxX = Math.max(...nodeXs) + 50;
-    const minY = Math.min(...nodeYs) - 50;
-    const maxY = Math.max(...nodeYs) + 50;
-
-    const graphWidth = maxX - minX;
-    const graphHeight = maxY - minY;
-
-    const scaleX = canvasSize.width / graphWidth;
-    const scaleY = canvasSize.height / graphHeight;
-    const newZoom = Math.min(scaleX, scaleY, 1.5) * 0.85;
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    setZoom(newZoom);
-    setOffset({
-      x: canvasSize.width / 2 - centerX * newZoom,
-      y: canvasSize.height / 2 - centerY * newZoom
-    });
-  };
 
   const handleMouseMoveForHover = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -382,13 +355,17 @@ const GraphView: React.FC = () => {
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
         <div className="flex gap-1 p-1.5 rounded-xl border" style={{ backgroundColor: GRAPH_COLORS.cardBg, borderColor: GRAPH_COLORS.border }}>
           <Button
-            onClick={handleFitToScreen}
+            onClick={() => setViewMode(viewMode === 'graph' ? 'split' : 'graph')}
             variant="ghost"
             size="icon"
             className="h-8 w-8 hover:bg-white/10 text-white"
-            title="Ver todo el grafo"
+            title={viewMode === 'graph' ? 'Salir de pantalla completa' : 'Pantalla completa'}
           >
-            <Maximize className="w-4 h-4" />
+            {viewMode === 'graph' ? (
+              <Minimize className="w-4 h-4" />
+            ) : (
+              <Maximize className="w-4 h-4" />
+            )}
           </Button>
           <div className="w-px bg-white/10 mx-0.5" />
           <Button
