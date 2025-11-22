@@ -6,10 +6,12 @@ import { useNoteStore } from '@/stores/noteStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Network, FileText, Move, ZoomIn, Hand, ZoomOut } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { 
   APP_CONFIG, 
   UI_MESSAGES, 
   PILLAR_COLORS,
+  PILLAR_COLORS_SVG,
   D3_SIMULATION,
   D3_ZOOM,
   ANIMATION_DURATION,
@@ -38,12 +40,21 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
 
 export function GraphView() {
   const { notes, setCurrentNote, setViewMode } = useNoteStore();
+  const { theme, resolvedTheme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('nodes');
+  const [mounted, setMounted] = useState(false);
+
+  // Detectar si estamos en dark mode
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDarkMode = mounted && (resolvedTheme === 'dark' || theme === 'dark');
 
   // Generar nodos y conexiones basadas en tags y referencias
   const { nodes, links } = useMemo(() => {
@@ -217,20 +228,32 @@ export function GraphView() {
       .append('line')
       .attr('stroke', 'currentColor')
       .attr('stroke-width', D3_SIMULATION.LINK_STROKE_WIDTH)
-      .attr('class', 'text-border opacity-30');
+      .attr('class', 'stroke-border opacity-30 dark:opacity-20');
 
-    // Dibujar nodos
+    // Dibujar nodos con colores mejorados para dark mode
     const nodeElements = nodeGroup
       .selectAll<SVGCircleElement, GraphNode>('circle')
       .data(nodes)
       .enter()
       .append('circle')
       .attr('r', APP_CONFIG.GRAPH_NODE_RADIUS)
-      .attr('class', (d) => {
-        const colorClass = PILLAR_COLORS[d.pillar as keyof typeof PILLAR_COLORS] ?? PILLAR_COLORS.default;
-        const cursorClass = interactionMode === 'nodes' ? 'cursor-move' : 'cursor-pointer';
-        return `${colorClass} ${cursorClass} transition-all hover:opacity-80`;
+      .attr('fill', (d) => {
+        const pillar = d.pillar as keyof typeof PILLAR_COLORS_SVG;
+        const colors = PILLAR_COLORS_SVG[pillar] ?? PILLAR_COLORS_SVG.default;
+        return isDarkMode ? colors.dark : colors.light;
       })
+      .attr('stroke', (d) => {
+        const pillar = d.pillar as keyof typeof PILLAR_COLORS_SVG;
+        const colors = PILLAR_COLORS_SVG[pillar] ?? PILLAR_COLORS_SVG.default;
+        // Borde más oscuro para mejor contraste
+        return isDarkMode ? colors.dark : colors.light;
+      })
+      .attr('stroke-width', isDarkMode ? '2' : '1')
+      .attr('class', (d) => {
+        const cursorClass = interactionMode === 'nodes' ? 'cursor-move' : 'cursor-pointer';
+        return `${cursorClass} transition-all hover:opacity-80`;
+      })
+      .style('filter', isDarkMode ? 'drop-shadow(0 0 4px rgba(255, 255, 255, 0.3))' : 'none')
       .call(nodeDrag)
       .on('click', (event, d) => {
         event.stopPropagation();
@@ -239,14 +262,17 @@ export function GraphView() {
         }
       });
 
-    // Dibujar etiquetas de texto
+    // Dibujar etiquetas de texto con mejor contraste
     const textElements = nodeGroup
       .selectAll<SVGTextElement, GraphNode>('text')
       .data(nodes)
       .enter()
       .append('text')
       .attr('text-anchor', 'middle')
-      .attr('class', 'text-xs fill-foreground pointer-events-none')
+      .attr('fill', isDarkMode ? '#f9fafb' : '#111827') // Mejor contraste en dark mode
+      .attr('class', 'text-xs pointer-events-none')
+      .style('font-weight', isDarkMode ? '500' : '400')
+      .style('text-shadow', isDarkMode ? '0 1px 2px rgba(0, 0, 0, 0.8)' : 'none')
       .text((d) =>
         d.title.length > APP_CONFIG.GRAPH_TITLE_MAX_LENGTH
           ? `${d.title.substring(0, APP_CONFIG.GRAPH_TITLE_MAX_LENGTH)}...`
@@ -286,7 +312,7 @@ export function GraphView() {
       svg.on('.zoom', null);
       svg.selectAll('*').remove();
     };
-  }, [nodes, links, interactionMode]);
+  }, [nodes, links, interactionMode, isDarkMode]);
 
   // Manejar cambios de modo y actualizar zoom
   useEffect(() => {
@@ -494,7 +520,7 @@ export function GraphView() {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative flex-1 overflow-hidden bg-muted/30">
+      <div ref={containerRef} className="relative flex-1 overflow-hidden bg-muted/30 dark:bg-muted/20">
         <svg
           ref={svgRef}
           className="h-full w-full"

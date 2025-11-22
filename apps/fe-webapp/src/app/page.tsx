@@ -10,7 +10,7 @@ import { FloatingActionButton } from '@/components/ui/floating-action-button';
 import { VoiceNoteRecorder } from '@/components/voice-note/VoiceNoteRecorder';
 import { useNoteStore } from '@/stores/noteStore';
 import { useNotes } from '@/hooks/useNotes';
-import { APP_CONFIG, UI_MESSAGES, FORMATTING, DEFAULT_TAGS } from '@/constants';
+import { APP_CONFIG, UI_MESSAGES, FORMATTING, DEFAULT_TAGS, DEFAULT_VALUES, DEFAULT_MESSAGES } from '@/constants';
 import { EMPTY_NOTE } from '@/data/mockData';
 
 export default function Home() {
@@ -51,7 +51,7 @@ export default function Home() {
       const formattedDuration = `${Math.floor(duration / FORMATTING.DURATION_MINUTES_PER_HOUR)}:${(duration % FORMATTING.DURATION_SECONDS_PER_MINUTE).toString().padStart(FORMATTING.DURATION_PAD_START, '0')}`;
       const recordedDate = new Date().toLocaleString(FORMATTING.DATE_LOCALE);
       
-      const audioContent = `# ${UI_MESSAGES.NEW_VOICE_NOTE_TITLE}\n\n<audio controls>\n  <source src="${base64Audio}" type="audio/webm">\n  Tu navegador no soporta el elemento de audio.\n</audio>\n\n*Duración: ${formattedDuration}*\n\n*Grabado el ${recordedDate}*`;
+      const audioContent = `# ${UI_MESSAGES.NEW_VOICE_NOTE_TITLE}\n\n<audio controls>\n  <source src="${base64Audio}" type="${DEFAULT_VALUES.AUDIO_MIME_TYPE}">\n  ${DEFAULT_MESSAGES.AUDIO_NOT_SUPPORTED}\n</audio>\n\n*Duración: ${formattedDuration}*\n\n*Grabado el ${recordedDate}*`;
       
       const newNote = {
         id: `note-${Date.now()}`,

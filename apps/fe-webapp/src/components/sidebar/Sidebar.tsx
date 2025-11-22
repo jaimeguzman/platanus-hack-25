@@ -28,6 +28,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const PILLARS = [
   { id: 'career', label: 'Desarrollo de Carrera', icon: Briefcase },
@@ -200,6 +201,7 @@ export function AppSidebar() {
       {/* Footer Actions */}
       <SidebarFooter>
         <SidebarMenu>
+          <ThemeToggle />
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Configuración">
               <Settings />

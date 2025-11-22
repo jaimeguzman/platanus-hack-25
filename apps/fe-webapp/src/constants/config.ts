@@ -64,9 +64,17 @@ export const UI_MESSAGES = {
 } as const;
 
 export const PILLAR_COLORS = {
-  career: 'bg-blue-500',
-  social: 'bg-green-500',
-  hobby: 'bg-purple-500',
-  default: 'bg-gray-500',
+  career: 'fill-blue-500 dark:fill-blue-400',
+  social: 'fill-green-500 dark:fill-green-400',
+  hobby: 'fill-purple-500 dark:fill-purple-400',
+  default: 'fill-gray-500 dark:fill-gray-400',
+} as const;
+
+// Colores para SVG con mejor contraste en dark mode
+export const PILLAR_COLORS_SVG = {
+  career: { light: '#3b82f6', dark: '#60a5fa' }, // blue-500, blue-400
+  social: { light: '#22c55e', dark: '#4ade80' }, // green-500, green-400
+  hobby: { light: '#a855f7', dark: '#c084fc' }, // purple-500, purple-400
+  default: { light: '#6b7280', dark: '#9ca3af' }, // gray-500, gray-400
 } as const;
 

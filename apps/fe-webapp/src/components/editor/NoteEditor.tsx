@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
+import * as React from 'react';
 import { useNoteStore } from '@/stores/noteStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,8 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from 'next-themes';
 import type { Components } from 'react-markdown';
 import { APP_CONFIG, UI_MESSAGES, DEFAULT_VALUES, FORMATTING } from '@/constants';
 
@@ -33,31 +36,45 @@ export function NoteEditor() {
   } = useNoteStore();
 
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { theme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Evitar hidration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Componentes personalizados para ReactMarkdown (memoizados para evitar recreación)
-  const markdownComponents: Partial<Components> = useMemo(() => ({
-    // Renderizado personalizado para bloques de código
-    code({ className, children, ...props }) {
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
-      const isInline = !className || !match;
-      
-      return !isInline && language ? (
-        <SyntaxHighlighter
-          style={vscDarkPlus as Record<string, React.CSSProperties>}
-          language={language}
-          PreTag="div"
-          className="rounded-md"
-        >
-          {String(children).replace(/\n$/, '')}
-        </SyntaxHighlighter>
-      ) : (
-        <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono" {...props}>
-          {children}
-        </code>
-      );
-    },
-  }), []);
+  const markdownComponents: Partial<Components> = useMemo(() => {
+    // Seleccionar estilo según el tema
+    const codeStyle = mounted && theme === 'dark' 
+      ? vscDarkPlus 
+      : oneLight;
+
+    return {
+      // Renderizado personalizado para bloques de código
+      code({ className, children, ...props }) {
+        const match = /language-(\w+)/.exec(className || '');
+        const language = match ? match[1] : '';
+        const isInline = !className || !match;
+        
+        return !isInline && language ? (
+          <SyntaxHighlighter
+            style={codeStyle as Record<string, React.CSSProperties>}
+            language={language}
+            PreTag="div"
+            className="rounded-md"
+          >
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
+        ) : (
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono" {...props}>
+            {children}
+          </code>
+        );
+      },
+    };
+  }, [theme, mounted]);
 
   // Auto-save cuando hay cambios
   useEffect(() => {
