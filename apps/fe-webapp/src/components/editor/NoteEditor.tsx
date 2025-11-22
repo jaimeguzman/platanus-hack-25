@@ -84,7 +84,7 @@ const NoteEditor: React.FC = () => {
 
   if (!activeNote) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-background">
+      <div className="flex-1 flex items-center justify-center bg-background h-full min-h-0">
         <div className="text-center max-w-lg px-6">
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center">
             <Edit3 className="w-10 h-10 text-violet-400" />
@@ -99,7 +99,7 @@ const NoteEditor: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-background h-full min-h-0 overflow-hidden">
       {/* Breadcrumbs */}
       {project && (
         <div className="px-8 py-3 border-b border-border bg-muted/30">
@@ -116,7 +116,7 @@ const NoteEditor: React.FC = () => {
       )}
 
       {/* Note Header */}
-      <div className="px-8 py-5 border-b border-border space-y-3">
+      <div className="px-8 pt-6 pb-5 border-b border-border space-y-3">
         <div className="flex items-center justify-between gap-4">
           <Input
             type="text"
@@ -126,79 +126,72 @@ const NoteEditor: React.FC = () => {
             placeholder="Sin título"
           />
           {/* Botones de acción agrupados */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Toggle Preview/Edit */}
-            <div className="flex items-center bg-muted/50 rounded-lg p-1 gap-1">
-              <Button
+          <div className="flex items-center gap-4 flex-shrink-0 pt-3 pr-">
+            {/* Toggle Preview/Edit - estilo link */}
+            <div className="flex items-center gap-3">
+              <button
                 onClick={() => setIsPreview(false)}
-                variant="ghost"
-                size="sm"
                 className={cn(
-                  "h-8 px-4 text-sm font-medium rounded-md transition-all",
+                  "flex items-center gap-1.5 text-sm font-medium transition-all duration-200 underline-offset-4",
                   !isPreview
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                    ? "text-violet-500 underline decoration-violet-500"
+                    : "text-muted-foreground hover:text-violet-500 underline decoration-transparent hover:decoration-violet-500"
                 )}
               >
-                <Edit3 className="w-4 h-4 mr-2" />
+                <Edit3 className="w-4 h-4" />
                 Editar
-              </Button>
-              <Button
+              </button>
+              <span className="text-muted-foreground/50">|</span>
+              <button
                 onClick={() => setIsPreview(true)}
-                variant="ghost"
-                size="sm"
                 className={cn(
-                  "h-8 px-4 text-sm font-medium rounded-md transition-all",
+                  "flex items-center gap-1.5 text-sm font-medium transition-all duration-200 underline-offset-4",
                   isPreview
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                    ? "text-violet-500 underline decoration-violet-500"
+                    : "text-muted-foreground hover:text-violet-500 underline decoration-transparent hover:decoration-violet-500"
                 )}
               >
-                <Eye className="w-4 h-4 mr-2" />
-                Vista previa
-              </Button>
+                <Eye className="w-4 h-4" />
+                Preview
+              </button>
             </div>
 
             {/* Separador */}
-            <div className="h-6 w-px bg-border" />
+            <div className="h-4 w-px bg-border" />
 
             {/* Favorito, Guardar y Exportar */}
-            <div className="flex items-center gap-1">
-              <Button
+            <div className="flex items-center gap-3 pr-6">
+              <button
                 onClick={handleTogglePinned}
-                variant="ghost"
-                size="sm"
                 className={cn(
-                  "h-8 px-3 text-sm hover:bg-accent transition-colors",
+                  "flex items-center gap-1.5 text-sm font-medium transition-all duration-200 underline-offset-4",
                   activeNote.isPinned
-                    ? "text-amber-500 hover:text-amber-400"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-amber-500 underline decoration-amber-500"
+                    : "text-muted-foreground hover:text-amber-500 underline decoration-transparent hover:decoration-amber-500"
                 )}
                 title={activeNote.isPinned ? "Quitar de favoritos" : "Agregar a favoritos"}
               >
-                <Star className={cn("w-4 h-4 mr-2", activeNote.isPinned && "fill-amber-500")} />
-                {activeNote.isPinned ? "Favorito" : "Favorito"}
-              </Button>
-              <Button
+                <Star className={cn("w-4 h-4", activeNote.isPinned && "fill-amber-500")} />
+                Favorito
+              </button>
+              <span className="text-muted-foreground/50">|</span>
+              <button
                 onClick={handleSave}
-                variant="ghost"
-                size="sm"
-                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-violet-500 underline underline-offset-4 decoration-transparent hover:decoration-violet-500 transition-all duration-200"
                 title="Guardar (Ctrl+S)"
               >
-                <Save className="w-4 h-4 mr-2" />
+                <Save className="w-4 h-4" />
                 Guardar
-              </Button>
-              <Button
+              </button>
+              <span className="text-muted-foreground/50">|</span>
+              <button
                 onClick={handleExport}
-                variant="ghost"
-                size="sm"
-                className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-violet-500 underline underline-offset-4 decoration-transparent hover:decoration-violet-500 transition-all duration-200"
                 title="Exportar a Markdown"
               >
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="w-4 h-4" />
                 Exportar
-              </Button>
+              </button>
             </div>
           </div>
         </div>
