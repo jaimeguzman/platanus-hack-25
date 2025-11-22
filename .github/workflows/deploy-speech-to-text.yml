@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'apis/api-sst/**'
-      - '.github/workflows/deploy-speech-to-text.yml'
+#    paths:
+#      - 'apis/api-sst/**'
+#      - '.github/workflows/deploy-speech-to-text.yml'
 
 permissions:
   contents: read
