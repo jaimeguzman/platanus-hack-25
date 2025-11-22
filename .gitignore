@@ -263,8 +263,8 @@ desktop.ini
 .terraform/
 .terraform.lock.hcl
 
-# Docker
-.dockerignore
+# Docker (keep .dockerignore files)
+# .dockerignore files are needed for the project
 
 # Certificates
 *.pem
