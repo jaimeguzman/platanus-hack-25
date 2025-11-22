@@ -52,7 +52,7 @@ Por favor lee [CONTRIBUTION.md](./CONTRIBUTION.md) para detalles sobre nuestro c
 
 ## Equipo
 
-Desarrollado durante Platanus Hack 25.
+Desarrollado durante Platanus Hack 25 :).
 
 ## Licencia
 
