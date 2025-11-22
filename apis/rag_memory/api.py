@@ -11,6 +11,7 @@ import logging
 from rag_service import RagMemoryService
 from models import Memory
 from config import config
+from openai import OpenAI
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, config.log_level))
@@ -80,6 +81,115 @@ class GraphExport(BaseModel):
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
     metadata: Dict[str, Any]
+
+class ProcessRequest(BaseModel):
+    text: str = Field(..., description="User input text, possibly from audio transcription")
+    category: Optional[str] = Field(None, description="Optional category hint")
+    source: Optional[str] = Field(None, description="Optional source identifier")
+    force_action: Optional[str] = Field(
+        None,
+        description="Optional forced action: 'save' or 'ask'. When set, bypasses intent routing"
+    )
+
+def _decide_intent_via_tool_call(text: str) -> str:
+    """
+    Pure tool-calling: force a single choice between 'save_memory' and 'answer_question'.
+    Returns 'save' or 'ask'. Defaults to 'save' on failure.
+    """
+    try:
+        client = OpenAI()
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_memory",
+                    "description": "Guardar el texto del usuario como una nueva memoria.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "category": {"type": "string"},
+                            "source": {"type": "string"},
+                        },
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "answer_question",
+                    "description": "Responder a la consulta del usuario usando el RAG.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "needs_citation": {"type": "boolean"}
+                        },
+                        "required": []
+                    }
+                }
+            }
+        ]
+        messages = [
+            {"role": "system", "content": "Elige exactamente una herramienta: 'save_memory' o 'answer_question'. No respondas directamente."},
+            {"role": "user", "content": text},
+        ]
+        resp = client.chat.completions.create(
+            model="gpt-5",
+            messages=messages,
+            tools=tools,
+            tool_choice="required",
+            temperature=0.0,
+            max_tokens=64,
+        )
+        tool_calls = getattr(resp.choices[0].message, "tool_calls", None)
+        if tool_calls and len(tool_calls) > 0:
+            name = tool_calls[0].function.name
+            if name == "answer_question":
+                return "ask"
+            if name == "save_memory":
+                return "save"
+        return "save"
+    except Exception as e:
+        logger.warning(f"Tool-calling decision failed: {e}")
+        return "save"
+
+def _generate_answer_with_context(query: str, results: List[Any]) -> str:
+    """
+    Minimal answer generation using OpenAI with retrieved RAG context.
+    results: List of (Memory, similarity_score)
+    """
+    try:
+        client = OpenAI()
+        context_snippets = []
+        for memory, score in results[:3]:
+            snippet = memory.text
+            if len(snippet) > 600:
+                snippet = snippet[:600] + "..."
+            context_snippets.append(f"- (sim={score:.2f}) {snippet}")
+        context_block = "\n".join(context_snippets) if context_snippets else "No context available."
+
+        system_prompt = (
+            "Eres un asistente que responde en español de forma breve y directa.\n"
+            "Usa SOLO el contexto proporcionado. Si no hay suficiente contexto, dilo explícitamente y sugiere guardarlo."
+        )
+        user_prompt = (
+            f"Pregunta del usuario:\n{query}\n\n"
+            f"Contexto relevante:\n{context_block}\n\n"
+            "Responde en 2-4 frases, citando brevemente de dónde sale si aplica."
+        )
+        resp = client.chat.completions.create(
+            model="gpt-5",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+            max_tokens=300,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        logger.error(f"Answer generation failed: {e}")
+        return "No pude generar una respuesta con el contexto disponible."
 
 # Health check endpoint
 @app.get("/health")
@@ -312,6 +422,68 @@ async def rebuild_graph():
         return {"message": "Graph rebuilt successfully"}
     except Exception as e:
         logger.error(f"Error rebuilding graph: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/process")
+async def process_input(request: ProcessRequest):
+    """
+    Unified endpoint to process user input (text from user or transcribed audio) via pure tool-calling.
+    Routes to:
+    - save: store as memory
+    - ask: perform semantic search and answer with context
+    """
+    try:
+        text = (request.text or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+        # Decide intent
+        if request.force_action in {"save", "ask"}:
+            intent = request.force_action
+            decider = "override"
+        else:
+            intent = _decide_intent_via_tool_call(text)
+            decider = "tool_calling"
+
+        if intent == "save":
+            memory = rag_service.add_memory(
+                text=text,
+                category=request.category,
+                source=request.source,
+            )
+            return {
+                "action": "saved",
+                "intent": "save",
+                "decider": decider,
+                "memory": MemoryResponse.from_memory(memory),
+            }
+        else:
+            results = rag_service.search_similar_by_text(
+                query_text=text,
+                limit=5,
+                category=request.category,
+            )
+            answer = _generate_answer_with_context(
+                query=text,
+                results=results,
+            )
+            return {
+                "action": "answered",
+                "intent": "ask",
+                "decider": decider,
+                "answer": answer,
+                "sources": [
+                    {
+                        "memory": MemoryResponse.from_memory(mem),
+                        "similarity_score": score,
+                    }
+                    for (mem, score) in results
+                ],
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing input: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

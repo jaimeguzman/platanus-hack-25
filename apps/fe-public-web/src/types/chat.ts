@@ -13,6 +13,7 @@ export enum MessageStatus {
 export interface Message {
   id: string;
   type: MessageType;
+  sender?: 'user' | 'assistant';
   text?: string;
   audioData?: Uint8Array;
   audioFileName?: string;

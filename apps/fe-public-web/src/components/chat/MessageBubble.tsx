@@ -1,8 +1,9 @@
 'use client';
 
-import { Message, MessageStatus, MessageType } from '@/types/chat';
+import type { Message } from '@/types/chat';
+import { MessageStatus, MessageType } from '@/types/chat';
+import { AlertCircle, Check, Clock, Loader2 } from 'lucide-react';
 import { AudioPlayer } from './AudioPlayer';
-import { Check, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -20,14 +21,15 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
   const renderStatusIcon = () => {
     switch (message.status) {
       case MessageStatus.Sending:
-        return <Clock className="w-3.5 h-3.5 opacity-70" />;
+        return <Clock className="opacity-70 w-3.5 h-3.5" />;
       case MessageStatus.Transcribing:
-        return <Loader2 className="w-3.5 h-3.5 opacity-70 animate-spin" />;
+        return <Loader2 className="opacity-70 w-3.5 h-3.5 animate-spin" />;
       case MessageStatus.Sent:
-        return <Check className="w-3.5 h-3.5 opacity-70" />;
+        return <Check className="opacity-70 w-3.5 h-3.5" />;
       case MessageStatus.Error:
         return (
           <button
+            type="button"
             onClick={() => onRetry?.(message.id)}
             className="hover:opacity-80 transition-opacity"
           >
@@ -37,48 +39,54 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     }
   };
 
+  const isAssistant = message.sender === 'assistant';
+  const alignmentClass = isAssistant ? 'justify-start' : 'justify-end';
+  const bubbleClass = isAssistant
+    ? 'max-w-[75%] bg-white text-gray-900 rounded-2xl rounded-bl-sm p-3 shadow border border-gray-200'
+    : 'max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-br-sm p-3 shadow-md';
+
   return (
-    <div className="flex justify-end px-4 py-1 animate-in slide-in-from-right-4 fade-in duration-300">
-      <div className="max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-br-sm p-3 shadow-md animate-in zoom-in-95 duration-200">
+    <div className={`flex ${alignmentClass} px-4 py-1 animate-in fade-in duration-300`}>
+      <div className={`${bubbleClass} animate-in zoom-in-95 duration-200`}>
         {message.type === MessageType.Text ? (
-          <p className="text-base whitespace-pre-wrap break-words">{message.text}</p>
+          <p className="text-base wrap-break-word whitespace-pre-wrap">{message.text}</p>
         ) : (
           <div className="space-y-2">
             <AudioPlayer message={message} />
             
             {/* Transcription loading indicator */}
             {message.status === MessageStatus.Transcribing && (
-              <div className="bg-black/10 rounded-lg p-3 border-l-2 border-white/30">
+              <div className="bg-black/10 p-3 border-white/30 border-l-2 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin opacity-70" />
-                  <p className="text-sm opacity-70">Transcribiendo audio...</p>
+                  <Loader2 className="opacity-70 w-4 h-4 animate-spin" />
+                  <p className="opacity-70 text-sm">Transcribiendo audio...</p>
                 </div>
-                <div className="mt-2 bg-white/20 rounded-full h-1 overflow-hidden">
-                  <div className="h-full bg-white/40 rounded-full animate-pulse"></div>
+                <div className="bg-white/20 mt-2 rounded-full h-1 overflow-hidden">
+                  <div className="bg-white/40 rounded-full h-full animate-pulse"></div>
                 </div>
               </div>
             )}
             
             {/* Transcription result */}
             {message.transcriptionText && message.status !== MessageStatus.Transcribing && (
-              <div className="bg-black/10 rounded-lg p-2 border-l-2 border-white/30">
-                <p className="text-xs opacity-70 mb-1">Transcripción:</p>
-                <p className="text-sm whitespace-pre-wrap wrap-break-word">{message.transcriptionText}</p>
+              <div className="bg-black/10 p-2 border-white/30 border-l-2 rounded-lg">
+                <p className="opacity-70 mb-1 text-xs">Transcripción:</p>
+                <p className="text-sm wrap-break-word whitespace-pre-wrap">{message.transcriptionText}</p>
               </div>
             )}
             
             {/* Error message */}
             {message.status === MessageStatus.Error && message.errorMessage && (
-              <div className="bg-red-500/20 rounded-lg p-2 border-l-2 border-red-300">
-                <p className="text-xs opacity-70 mb-1">Error:</p>
+              <div className="bg-red-500/20 p-2 border-red-300 border-l-2 rounded-lg">
+                <p className="opacity-70 mb-1 text-xs">Error:</p>
                 <p className="text-sm">{message.errorMessage}</p>
               </div>
             )}
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-1 mt-1">
-          <span className="text-xs opacity-70">
+        <div className={`flex items-center ${isAssistant ? 'justify-start' : 'justify-end'} gap-1 mt-1`}>
+          <span className="opacity-70 text-xs">
             {formatTime(message.timestamp)}
           </span>
           {renderStatusIcon()}
