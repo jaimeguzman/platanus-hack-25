@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { Note, Project } from '../types/note';
-import { MOCK_PROJECTS, FALLBACK_VALUES, NUMERIC_CONSTANTS } from '../constants/mockData';
+import { MOCK_PROJECTS, MOCK_NOTES, FALLBACK_VALUES, NUMERIC_CONSTANTS } from '../constants/mockData';
 
 interface PKMState {
   // Notes
@@ -9,42 +9,44 @@ interface PKMState {
   activeNoteId: string | null;
   searchQuery: string;
   selectedProjectId: string | null;
-  
+
   // Projects
   projects: Project[];
-  
+
   // UI State
   sidebarOpen: boolean;
   viewMode: 'editor' | 'graph' | 'split';
-  
+
   // Actions
   addNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   setActiveNote: (id: string | null) => void;
-  
+  togglePinned: (id: string) => void;
+
   addProject: (project: Omit<Project, 'id' | 'createdAt'>) => string;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   setSelectedProject: (id: string | null) => void;
-  
+
   setSearchQuery: (query: string) => void;
   toggleSidebar: () => void;
   setViewMode: (mode: 'editor' | 'graph' | 'split') => void;
-  
+
   // Getters
   getFilteredNotes: () => Note[];
   getProjectNotes: (projectId: string) => Note[];
   getNoteById: (id: string) => Note | undefined;
   getRecentNotes: () => Note[];
+  getPinnedNotes: () => Note[];
 }
 
 export const usePKMStore = create<PKMState>()(
   devtools(
     (set, get) => ({
       // Initial state
-      notes: [],
-      activeNoteId: null,
+      notes: MOCK_NOTES,
+      activeNoteId: 'note-1',
       searchQuery: '',
       selectedProjectId: null,
       projects: MOCK_PROJECTS,
@@ -91,6 +93,16 @@ export const usePKMStore = create<PKMState>()(
 
       setActiveNote: (id) => {
         set({ activeNoteId: id });
+      },
+
+      togglePinned: (id) => {
+        set((state) => ({
+          notes: state.notes.map(note =>
+            note.id === id
+              ? { ...note, isPinned: !note.isPinned, updatedAt: new Date() }
+              : note
+          )
+        }));
       },
 
       addProject: (projectData) => {
@@ -195,6 +207,16 @@ export const usePKMStore = create<PKMState>()(
             return bTime - aTime;
           })
           .slice(0, NUMERIC_CONSTANTS.recentNotesLimit);
+      },
+
+      getPinnedNotes: () => {
+        return get().notes
+          .filter(note => note.isPinned)
+          .sort((a, b) => {
+            const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt).getTime();
+            const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt).getTime();
+            return bTime - aTime;
+          });
       }
     })
   )

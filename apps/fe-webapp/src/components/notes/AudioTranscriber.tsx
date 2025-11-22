@@ -1,41 +1,61 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePKMStore } from '@/stores/pkmStore';
-import { Mic, Square, Upload, FileAudio, Loader2 } from 'lucide-react';
+import { Mic, Square, Upload, FileAudio, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const AudioTranscriber: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const { addNote } = usePKMStore();
+  const { addNote, setActiveNote } = usePKMStore();
+
+  // Crear y limpiar URL del audio cuando cambia el blob
+  useEffect(() => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      setAudioUrl(null);
+    }
+  }, [audioBlob]);
 
   const startRecording = async () => {
     try {
+      // Limpiar grabación anterior al iniciar una nueva
+      setAudioBlob(null);
+      setTranscription('');
+      setSaved(false);
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      
+
       const chunks: BlobPart[] = [];
-      
+
       mediaRecorder.ondataavailable = (event) => {
         chunks.push(event.data);
       };
-      
+
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
-      
+
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Could not start recording. Please check microphone permissions.');
+      alert('No se pudo iniciar la grabación. Por favor verifica los permisos del micrófono.');
     }
   };
 
@@ -49,146 +69,158 @@ const AudioTranscriber: React.FC = () => {
   const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Limpiar estado anterior
+      setTranscription('');
+      setSaved(false);
       setAudioBlob(file);
+      // Resetear el input para permitir subir el mismo archivo de nuevo
+      event.target.value = '';
     }
   };
 
   const transcribeAudio = async () => {
     if (!audioBlob) return;
-    
+
     setIsTranscribing(true);
-    
+
     // Simulate transcription (in a real app, you'd call an AI API)
     setTimeout(() => {
-      const mockTranscription = `This is a simulated transcription of your audio recording. 
+      const mockTranscription = `Esta es una transcripción simulada de tu grabación de audio.
 
-In a real implementation, this would use AI services like:
+En una implementación real, esto usaría servicios de IA como:
 - OpenAI Whisper API
 - Google Cloud Speech-to-Text
 - Azure Speech Services
-- Web Speech API (browser native)
+- Web Speech API (nativo del navegador)
 
-The transcription would capture your thoughts, ideas, and notes that you can then organize and connect with other notes in your knowledge base.`;
-      
+La transcripción capturaría tus pensamientos, ideas y notas que luego puedes organizar y conectar con otras notas en tu base de conocimiento.`;
+
       setTranscription(mockTranscription);
       setIsTranscribing(false);
-    }, 3000);
+    }, 2000);
   };
 
   const saveAsNote = () => {
     if (transcription.trim()) {
-      addNote({
-        title: `Audio Note - ${new Date().toLocaleString()}`,
+      const noteId = addNote({
+        title: `Nota de Audio - ${new Date().toLocaleDateString('es-ES')}`,
         content: transcription,
-        tags: ['audio', 'transcription'],
+        tags: ['audio', 'transcripción'],
         projectId: undefined
       });
-      
-      // Reset form
-      setAudioBlob(null);
-      setTranscription('');
-      
-      alert('Note created successfully!');
+
+      setSaved(true);
+      setTimeout(() => {
+        // Reset form
+        setAudioBlob(null);
+        setTranscription('');
+        setSaved(false);
+        setActiveNote(noteId);
+      }, 1500);
     }
   };
 
   return (
-    <div className="bg-[#1A1A1A] rounded-lg p-8 max-w-2xl mx-auto border border-[#2A2A2A]">
-      <div className="mb-8">
-        <h3 className="text-2xl font-semibold mb-2 flex items-center text-[#EEEEEE] tracking-tight">
-          <FileAudio className="w-6 h-6 mr-3 text-[#EEEEEE]" />
-          Audio Transcription
-        </h3>
-        <p className="text-sm text-[#999999] ml-9">Record or upload audio to transcribe into notes</p>
-      </div>
-      
+    <div className="space-y-6">
       {/* Recording Controls */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-6">
-          {!isRecording ? (
-            <Button
-              onClick={startRecording}
-              className="flex items-center gap-2 px-6 py-3 h-auto bg-[#2A2A2A] hover:bg-[#3A3A3A] text-[#EEEEEE] font-medium transition-colors"
-            >
-              <Mic className="w-5 h-5" />
-              <span>Start Recording</span>
-            </Button>
-          ) : (
-            <Button
-              onClick={stopRecording}
-              className="flex items-center gap-2 px-6 py-3 h-auto bg-[#FF6B35] hover:bg-[#FF7B45] text-white font-medium transition-colors animate-pulse"
-            >
-              <Square className="w-5 h-5" />
-              <span>Stop Recording</span>
-            </Button>
-          )}
-          
-          <label className="flex items-center gap-2 px-6 py-3 h-auto bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg text-[#EEEEEE] cursor-pointer transition-colors font-medium">
-            <Upload className="w-5 h-5" />
-            <span>Upload Audio</span>
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={handleAudioUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
-        
-        {audioBlob && (
-          <div className="bg-[#111111] p-6 rounded-lg border border-[#2A2A2A] space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-[#EEEEEE]">Audio file ready</p>
-              <p className="text-xs text-[#999999]">{Math.round(audioBlob.size / 1024)}KB</p>
-            </div>
-            <audio controls className="w-full">
-              <source src={URL.createObjectURL(audioBlob)} type="audio/wav" />
-            </audio>
-            <Button
-              onClick={transcribeAudio}
-              disabled={isTranscribing}
-              className="w-full px-6 py-3 h-auto bg-[#2A2A2A] hover:bg-[#3A3A3A] disabled:bg-[#1A1A1A] disabled:opacity-50 text-[#EEEEEE] font-medium transition-colors"
-            >
-              {isTranscribing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Transcribing...
-                </span>
-              ) : (
-                'Transcribe Audio'
-              )}
-            </Button>
-          </div>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {!isRecording ? (
+          <Button
+            onClick={startRecording}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 h-auto bg-violet-600 hover:bg-violet-700 text-white font-medium transition-colors"
+          >
+            <Mic className="w-4 h-4" />
+            <span>Iniciar Grabación</span>
+          </Button>
+        ) : (
+          <Button
+            onClick={stopRecording}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 h-auto bg-red-500 hover:bg-red-600 text-white font-medium transition-colors animate-pulse"
+          >
+            <Square className="w-4 h-4" />
+            <span>Detener Grabación</span>
+          </Button>
         )}
+
+        <label className="flex items-center justify-center gap-2 px-5 py-2.5 h-auto bg-secondary hover:bg-accent rounded-md text-foreground cursor-pointer transition-colors font-medium border border-border">
+          <Upload className="w-4 h-4" />
+          <span>Subir Audio</span>
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={handleAudioUpload}
+            className="hidden"
+          />
+        </label>
       </div>
-      
+
+      {/* Audio Preview - Solo mostrar cuando hay audio Y no está grabando */}
+      {audioBlob && audioUrl && !isRecording && (
+        <div className="bg-muted/50 p-4 rounded-lg border border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileAudio className="w-4 h-4 text-violet-500" />
+              <p className="text-sm font-medium text-foreground">Audio listo</p>
+            </div>
+            <p className="text-xs text-muted-foreground">{Math.round(audioBlob.size / 1024)} KB</p>
+          </div>
+          <audio controls className="w-full h-10" key={audioUrl}>
+            <source src={audioUrl} type="audio/wav" />
+          </audio>
+          <Button
+            onClick={transcribeAudio}
+            disabled={isTranscribing}
+            className="w-full px-5 py-2.5 h-auto bg-violet-600 hover:bg-violet-700 disabled:bg-muted disabled:text-muted-foreground text-white font-medium transition-colors"
+          >
+            {isTranscribing ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Transcribiendo...
+              </span>
+            ) : (
+              'Transcribir Audio'
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Transcription Result */}
       {transcription && (
-        <div className="mb-8 space-y-4">
+        <div className="space-y-4">
           <div>
-            <h4 className="text-base font-semibold mb-3 text-[#EEEEEE]">Transcription</h4>
+            <label className="text-sm font-medium text-foreground mb-2 block">Transcripción</label>
             <textarea
               value={transcription}
               onChange={(e) => setTranscription(e.target.value)}
-              className="w-full min-h-[200px] p-4 bg-[#111111] border border-[#2A2A2A] rounded-lg text-[#EEEEEE] text-sm leading-relaxed resize-none focus:outline-none focus:border-[#4A5560] focus:ring-2 focus:ring-[#4A5560]/20 placeholder:text-[#666666] transition-all"
-              placeholder="Transcription will appear here..."
+              className="w-full min-h-[180px] p-4 bg-background border border-border rounded-lg text-foreground text-sm leading-relaxed resize-none focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 placeholder:text-muted-foreground transition-all"
+              placeholder="La transcripción aparecerá aquí..."
             />
           </div>
           <Button
             onClick={saveAsNote}
-            className="w-full px-6 py-3 h-auto bg-[#2A2A2A] hover:bg-[#3A3A3A] text-[#EEEEEE] font-medium transition-colors"
+            disabled={saved}
+            className="w-full px-5 py-2.5 h-auto bg-violet-600 hover:bg-violet-700 disabled:bg-green-600 text-white font-medium transition-colors"
           >
-            Save as Note
+            {saved ? (
+              <span className="flex items-center justify-center gap-2">
+                <Check className="w-4 h-4" />
+                ¡Nota guardada!
+              </span>
+            ) : (
+              'Guardar como Nota'
+            )}
           </Button>
         </div>
       )}
-      
+
       {/* Instructions */}
-      <div className="pt-6 border-t border-[#2A2A2A]">
-        <p className="text-sm text-[#999999] leading-relaxed">
-          <span className="font-medium text-[#EEEEEE]">Tip:</span> Click "Start Recording" to record your voice, or upload an existing audio file. Edit the transcription and save as a note to add it to your knowledge base.
-        </p>
-      </div>
+      {!audioBlob && !transcription && (
+        <div className="bg-muted/30 rounded-lg p-4 border border-border">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <span className="font-medium text-foreground">Instrucciones:</span> Haz clic en "Iniciar Grabación" para grabar tu voz, o sube un archivo de audio existente. Edita la transcripción y guárdala como nota para añadirla a tu base de conocimiento.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

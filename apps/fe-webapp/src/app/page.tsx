@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { SPACING } from '@/constants/spacing';
 import { DEFAULT_VALUES, FALLBACK_VALUES } from '@/constants/mockData';
@@ -128,19 +128,19 @@ export default function Home() {
           <div className={cn('flex-1', SPACING.search.maxWidth, SPACING.search.marginX)} role="search" aria-label="Search notes">
             <div className="relative">
               <label htmlFor="search-notes" className="sr-only">
-                Search notes
+                Buscar notas
               </label>
               <Input
                 id="search-notes"
                 type="search"
-                placeholder="Search notes..."
-                aria-label="Search notes"
+                placeholder="Buscar notas..."
+                aria-label="Buscar notas"
                 aria-describedby="search-description"
                 className={cn(
                   SPACING.input.paddingRightWithIcon
                 )}
               />
-              <Search 
+              <Search
                 className={cn(
                   'absolute top-1/2 -translate-y-1/2 pointer-events-none z-10 text-muted-foreground',
                   SPACING.input.iconRight,
@@ -149,80 +149,119 @@ export default function Home() {
                 aria-hidden="true"
               />
               <span id="search-description" className="sr-only">
-                Search through your notes by title, content, or tags
+                Buscar en tus notas por título, contenido o tags
               </span>
             </div>
           </div>
 
           {/* Right: Actions */}
-          <nav 
+          <nav
             className={cn('flex items-center flex-shrink-0', SPACING.gap.md)}
             aria-label="Main actions"
           >
-            <Button
-              onClick={handleNewNote}
-              variant="ghost"
-              size="sm"
-              aria-label="Create new note"
-              title="Create new note (Ctrl+N)"
-              className={cn(
-                'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                SPACING.button.sm.height,
-                SPACING.button.sm.paddingX,
-                SPACING.button.sm.fontSize
-              )}
-            >
-              New
-            </Button>
-            <Button
-              onClick={() => setShowAudioTranscriber(true)}
-              variant="ghost"
-              size="sm"
-              aria-label="Open audio transcriber"
-              title="Transcribe audio to text"
-              className={cn(
-                'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
-                SPACING.button.sm.height,
-                SPACING.button.sm.paddingX,
-                SPACING.button.sm.fontSize
-              )}
-            >
-              Audio
-            </Button>
-            <div 
-              className={cn(
-                'bg-border',
-                SPACING.separator.height,
-                SPACING.separator.width,
-                SPACING.separator.marginX
-              )}
-              role="separator"
-              aria-orientation="vertical"
-              aria-hidden="true"
-            />
-            <div 
+            {/* Mostrar Nuevo y Audio solo cuando NO estamos en vista de grafo */}
+            {viewMode === 'editor' && (
+              <>
+                <Button
+                  onClick={handleNewNote}
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Crear nueva nota"
+                  title="Crear nueva nota (Ctrl+N)"
+                  className={cn(
+                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
+                    SPACING.button.sm.height,
+                    SPACING.button.sm.paddingX,
+                    SPACING.button.sm.fontSize
+                  )}
+                >
+                  Nueva nota
+                </Button>
+                <Button
+                  onClick={() => setShowAudioTranscriber(true)}
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Abrir transcriptor de audio"
+                  title="Transcribir audio a texto"
+                  className={cn(
+                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
+                    SPACING.button.sm.height,
+                    SPACING.button.sm.paddingX,
+                    SPACING.button.sm.fontSize
+                  )}
+                >
+                  Nuevo audio
+                </Button>
+                <div
+                  className={cn(
+                    'bg-border',
+                    SPACING.separator.height,
+                    SPACING.separator.width,
+                    SPACING.separator.marginX
+                  )}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-hidden="true"
+                />
+              </>
+            )}
+
+            {/* Mostrar botón Salir cuando estamos en vista de grafo o dividida */}
+            {(viewMode === 'graph' || viewMode === 'split') && (
+              <>
+                <Button
+                  onClick={() => setViewMode('editor')}
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Salir del visor"
+                  title="Volver al editor"
+                  className={cn(
+                    'text-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background whitespace-nowrap transition-all',
+                    SPACING.button.sm.height,
+                    SPACING.button.sm.paddingX,
+                    SPACING.button.sm.fontSize
+                  )}
+                >
+                  <X className="w-4 h-4 mr-1.5" />
+                  Salir
+                </Button>
+                <div
+                  className={cn(
+                    'bg-border',
+                    SPACING.separator.height,
+                    SPACING.separator.width,
+                    SPACING.separator.marginX
+                  )}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-hidden="true"
+                />
+              </>
+            )}
+
+            <div
               className={cn(
                 'flex items-center bg-card rounded-md border border-border',
                 SPACING.viewMode.container.padding,
                 SPACING.viewMode.container.gap
               )}
               role="group"
-              aria-label="View mode selector"
+              aria-label="Selector de vista"
             >
               <Button
                 onClick={() => setViewMode('editor')}
                 variant={viewMode === 'editor' ? 'default' : 'ghost'}
                 size="sm"
-                aria-label="Editor view"
+                aria-label="Vista editor"
                 aria-pressed={viewMode === 'editor'}
-                title="Editor view - Edit notes in markdown"
+                title="Vista editor - Editar notas en markdown"
                 className={cn(
                   'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
                   SPACING.viewMode.button.height,
                   SPACING.viewMode.button.paddingX,
                   SPACING.button.sm.fontSize,
-                  viewMode === 'editor' 
-                    ? 'bg-secondary text-foreground shadow-sm' 
+                  viewMode === 'editor'
+                    ? 'bg-secondary text-foreground shadow-sm'
                     : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -232,42 +271,42 @@ export default function Home() {
                 onClick={() => setViewMode('graph')}
                 variant={viewMode === 'graph' ? 'default' : 'ghost'}
                 size="sm"
-                aria-label="Graph view"
+                aria-label="Visor gráfico"
                 aria-pressed={viewMode === 'graph'}
-                title="Graph view - Visualize note connections"
+                title="Visor gráfico - Visualizar conexiones entre notas"
                 className={cn(
                   'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
                   SPACING.viewMode.button.height,
                   SPACING.viewMode.button.paddingX,
                   SPACING.button.sm.fontSize,
-                  viewMode === 'graph' 
-                    ? 'bg-secondary text-foreground shadow-sm' 
+                  viewMode === 'graph'
+                    ? 'bg-secondary text-foreground shadow-sm'
                     : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
-                Graph
+                Visor
               </Button>
               <Button
                 onClick={() => setViewMode('split')}
                 variant={viewMode === 'split' ? 'default' : 'ghost'}
                 size="sm"
-                aria-label="Split view"
+                aria-label="Vista dividida"
                 aria-pressed={viewMode === 'split'}
-                title="Split view - Editor and graph side by side"
+                title="Vista dividida - Editor y visor lado a lado"
                 className={cn(
                   'text-foreground whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
                   SPACING.viewMode.button.height,
                   SPACING.viewMode.button.paddingX,
                   SPACING.button.sm.fontSize,
-                  viewMode === 'split' 
-                    ? 'bg-secondary text-foreground shadow-sm' 
+                  viewMode === 'split'
+                    ? 'bg-secondary text-foreground shadow-sm'
                     : 'hover:bg-secondary bg-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
-                Split
+                Dividir
               </Button>
             </div>
-            <div 
+            <div
               className={cn(
                 'bg-border',
                 SPACING.separator.height,
@@ -303,7 +342,7 @@ export default function Home() {
       <Dialog open={showAudioTranscriber} onOpenChange={setShowAudioTranscriber}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-light">Audio Transcription</DialogTitle>
+            <DialogTitle className="font-light">Transcripción de Audio</DialogTitle>
           </DialogHeader>
           <AudioTranscriber />
         </DialogContent>

@@ -18,16 +18,16 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider>
           {/* Navigation */}
-          <nav className="fixed top-4 right-4 z-50 flex gap-3">
+          <nav className="fixed bottom-4 right-4 z-50 flex gap-2">
             <Link
               href="/"
-              className="px-4 py-2 bg-[#141414] hover:bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-sm font-light text-[#E5E5E5] transition-colors"
+              className="px-3 py-1.5 bg-[#141414] hover:bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-xs font-light text-[#E5E5E5] transition-colors"
             >
               PKM
             </Link>
             <Link
               href="/transcribe"
-              className="px-4 py-2 bg-[#4A5C4A] hover:bg-[#5A6C5A] border border-[#4A5C4A] rounded-lg text-sm font-light text-white transition-colors"
+              className="px-3 py-1.5 bg-[#4A5C4A] hover:bg-[#5A6C5A] border border-[#4A5C4A] rounded-lg text-xs font-light text-white transition-colors"
             >
               Transcribir Audio
             </Link>
