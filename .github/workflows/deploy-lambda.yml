@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'services/rag_memory/**'
+      - 'apis/rag_memory/**'
       - '.github/workflows/deploy-lambda.yml'
 
 permissions:
@@ -29,12 +29,12 @@ jobs:
           
       - name: Install Python dependencies in the target directory
         run: |
-          cd services/rag_memory
+          cd apis/rag_memory
           pip install -r requirements.txt -t .
       
       - name: Zip entire project for Lambda
         run: |
-          cd services/rag_memory
+          cd apis/rag_memory
           zip -r ../../rag_memory.zip .
           cd ../../
           
