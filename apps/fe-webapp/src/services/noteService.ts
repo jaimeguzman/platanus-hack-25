@@ -448,13 +448,20 @@ export async function toggleNoteFavorite(id: string, isFavorite: boolean): Promi
 
 export async function searchNotes(query: string): Promise<Note[]> {
   try {
+    if (!query || !query.trim()) {
+      return [];
+    }
+
     const supabase = getSupabaseClient();
+    const searchTerm = `%${query.trim()}%`;
     
-    // Buscar en notes_full (incluye tags) y filtrar por título, contenido o tags
+    // Buscar en notes_full (incluye tags) y filtrar por título o contenido
+    // Usar ilike para búsqueda case-insensitive
+    // La sintaxis correcta para .or() es: 'field1.ilike.value1,field2.ilike.value2'
     const { data: notesData, error: searchError } = await supabase
       .from('notes_full')
       .select('*')
-      .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+      .or(`title.ilike.${searchTerm},content.ilike.${searchTerm}`)
       .order('updated_at', { ascending: false });
 
     if (searchError) {
@@ -464,12 +471,12 @@ export async function searchNotes(query: string): Promise<Note[]> {
       );
     }
 
-    if (!notesData) {
+    if (!notesData || notesData.length === 0) {
       return [];
     }
 
     // Filtrar por tags si el query coincide (búsqueda en memoria sobre tags)
-    const queryLower = query.toLowerCase();
+    const queryLower = query.toLowerCase().trim();
     const filteredByTags = notesData.filter((note) => {
       const tags = Array.isArray(note.tags) ? note.tags : [];
       return tags.some((tag: string) => tag.toLowerCase().includes(queryLower));
@@ -478,7 +485,10 @@ export async function searchNotes(query: string): Promise<Note[]> {
     // Combinar resultados y eliminar duplicados
     const allResults = [...notesData, ...filteredByTags];
     const uniqueResults = Array.from(
-      new Map(allResults.map((note) => [note.id, note])).values()
+      new Map(allResults.map((note) => {
+        const noteRecord = note as Record<string, unknown>;
+        return [noteRecord.id as string, note];
+      })).values()
     );
 
     // Obtener backlinks para todas las notas
