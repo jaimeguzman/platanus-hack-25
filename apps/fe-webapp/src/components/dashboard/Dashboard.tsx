@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { FileText, TrendingUp, Clock, Tag, Star } from 'lucide-react';
 import { useMemo } from 'react';
-import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
+import { APP_CONFIG, UI_MESSAGES, FORMATTING } from '@/constants';
 
 export function Dashboard() {
   const { getFilteredNotes, notes, setCurrentNote, setViewMode, toggleNoteFavorite } = useNoteStore();
@@ -131,10 +131,7 @@ export function Dashboard() {
                       <h4 className="font-medium">{note.title}</h4>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">
-                          {new Date(note.updatedAt).toLocaleDateString(APP_CONFIG.DEFAULT_LOCALE, {
-                            day: 'numeric',
-                            month: 'short',
-                          })}
+                          {new Date(note.updatedAt).toLocaleDateString(FORMATTING.DATE_LOCALE, FORMATTING.DATE_OPTIONS_DAY_MONTH)}
                         </span>
                         {note.tags.length > 0 && (
                           <>
@@ -148,9 +145,9 @@ export function Dashboard() {
                                   {tag}
                                 </span>
                               ))}
-                              {note.tags.length > 3 && (
+                              {note.tags.length > APP_CONFIG.MAX_TAGS_DISPLAY && (
                                 <span className="text-xs text-muted-foreground">
-                                  +{note.tags.length - 3}
+                                  +{note.tags.length - APP_CONFIG.MAX_TAGS_DISPLAY}
                                 </span>
                               )}
                             </div>

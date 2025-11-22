@@ -11,7 +11,7 @@ import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Components } from 'react-markdown';
-import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
+import { APP_CONFIG, UI_MESSAGES, DEFAULT_VALUES, FORMATTING } from '@/constants';
 
 export function NoteEditor() {
   const {
@@ -86,11 +86,11 @@ export function NoteEditor() {
     if (!currentNote) return;
 
     const markdown = `# ${editorTitle}\n\n${editorContent}\n\n${editorTags.map((tag) => `#${tag}`).join(' ')}`;
-    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const blob = new Blob([markdown], { type: DEFAULT_VALUES.MARKDOWN_FILE_TYPE });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${editorTitle.replace(/\s+/g, '-')}.md`;
+    a.download = `${editorTitle.replace(FORMATTING.FILE_NAME_REPLACE_PATTERN, FORMATTING.FILE_NAME_REPLACE_WITH)}${DEFAULT_VALUES.MARKDOWN_FILE_EXTENSION}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

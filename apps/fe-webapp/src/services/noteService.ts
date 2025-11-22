@@ -1,14 +1,13 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Note } from '@/types/note';
 import { NoteServiceError, ERROR_CODES } from '@/lib/errors';
-
-const NOTES_TABLE = 'notes';
+import { DB_TABLES } from '@/constants';
 
 export async function fetchNotes(): Promise<Note[]> {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from(NOTES_TABLE)
+      .from(DB_TABLES.NOTES)
       .select('*')
       .order('updated_at', { ascending: false });
 
@@ -42,7 +41,7 @@ export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedA
     const isFavorite = note.isFavorite ?? false;
     
     const { data, error } = await supabase
-      .from(NOTES_TABLE)
+      .from(DB_TABLES.NOTES)
       .insert({
         title: note.title,
         content: note.content,
@@ -94,7 +93,7 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<No
     }
 
     const { data, error } = await supabase
-      .from(NOTES_TABLE)
+      .from(DB_TABLES.NOTES)
       .update(updateData as never)
       .eq('id', id)
       .select()
@@ -144,7 +143,7 @@ export async function fetchFavoriteNotes(): Promise<Note[]> {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from(NOTES_TABLE)
+      .from(DB_TABLES.NOTES)
       .select('*')
       .eq('is_favorite', true)
       .order('updated_at', { ascending: false });
@@ -178,7 +177,7 @@ export async function searchNotes(query: string): Promise<Note[]> {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
-      .from(NOTES_TABLE)
+      .from(DB_TABLES.NOTES)
       .select('*')
       .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
       .order('updated_at', { ascending: false });

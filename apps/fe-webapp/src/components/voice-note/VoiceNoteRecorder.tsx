@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UI_MESSAGES } from '@/constants/config';
+import { UI_MESSAGES, FORMATTING, MEDIA_RECORDING, MEDIA_PLAYBACK } from '@/constants';
 
 interface VoiceNoteRecorderProps {
   onSave: (audioBlob: Blob, duration: number) => void;
@@ -25,27 +25,27 @@ export function VoiceNoteRecorder({ onSave, onCancel }: VoiceNoteRecorderProps) 
 
   // Formatear duración en formato MM:SS
   const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const mins = Math.floor(seconds / FORMATTING.DURATION_MINUTES_PER_HOUR);
+    const secs = Math.floor(seconds % FORMATTING.DURATION_SECONDS_PER_MINUTE);
+    return `${mins.toString().padStart(FORMATTING.DURATION_PAD_START, '0')}:${secs.toString().padStart(FORMATTING.DURATION_PAD_START, '0')}`;
   };
 
   // Iniciar grabación
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia(MEDIA_RECORDING.AUDIO_CONSTRAINTS);
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data.size > MEDIA_PLAYBACK.MIN_DATA_SIZE) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: MEDIA_RECORDING.AUDIO_MIME_TYPE });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
@@ -59,7 +59,7 @@ export function VoiceNoteRecorder({ onSave, onCancel }: VoiceNoteRecorderProps) 
       // Actualizar duración cada segundo
       intervalRef.current = setInterval(() => {
         setDuration((prev) => prev + 1);
-      }, 1000);
+      }, MEDIA_RECORDING.DURATION_UPDATE_INTERVAL);
     } catch (error) {
       console.error('Error al iniciar grabación:', error);
       alert('No se pudo acceder al micrófono. Por favor, verifica los permisos.');

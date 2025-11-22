@@ -25,8 +25,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+import { SIDEBAR_CONFIG } from '@/constants';
+
+const SIDEBAR_COOKIE_NAME = SIDEBAR_CONFIG.COOKIE_NAME;
+const SIDEBAR_COOKIE_MAX_AGE = SIDEBAR_CONFIG.COOKIE_MAX_AGE_SECONDS;
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"

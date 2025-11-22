@@ -143,18 +143,9 @@ export function AppSidebar() {
 
         {/* Pillars */}
         <SidebarGroup>
-          <SidebarGroupLabel>Pilares</SidebarGroupLabel>
+          <SidebarGroupLabel>Areas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => setSelectedPillar('all')}
-                  isActive={selectedPillar === 'all'}
-                  tooltip="Todos"
-                >
-                  <span>Todos</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               {PILLARS.map((pillar) => {
                 const Icon = pillar.icon;
                 return (
