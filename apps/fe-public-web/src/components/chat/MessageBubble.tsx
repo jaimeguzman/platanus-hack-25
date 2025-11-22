@@ -2,7 +2,7 @@
 
 import { Message, MessageStatus, MessageType } from '@/types/chat';
 import { AudioPlayer } from './AudioPlayer';
-import { Check, Clock, AlertCircle } from 'lucide-react';
+import { Check, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -21,6 +21,8 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     switch (message.status) {
       case MessageStatus.Sending:
         return <Clock className="w-3.5 h-3.5 opacity-70" />;
+      case MessageStatus.Transcribing:
+        return <Loader2 className="w-3.5 h-3.5 opacity-70 animate-spin" />;
       case MessageStatus.Sent:
         return <Check className="w-3.5 h-3.5 opacity-70" />;
       case MessageStatus.Error:
@@ -41,7 +43,38 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
         {message.type === MessageType.Text ? (
           <p className="text-base whitespace-pre-wrap break-words">{message.text}</p>
         ) : (
-          <AudioPlayer message={message} />
+          <div className="space-y-2">
+            <AudioPlayer message={message} />
+            
+            {/* Transcription loading indicator */}
+            {message.status === MessageStatus.Transcribing && (
+              <div className="bg-black/10 rounded-lg p-3 border-l-2 border-white/30">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin opacity-70" />
+                  <p className="text-sm opacity-70">Transcribiendo audio...</p>
+                </div>
+                <div className="mt-2 bg-white/20 rounded-full h-1 overflow-hidden">
+                  <div className="h-full bg-white/40 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            )}
+            
+            {/* Transcription result */}
+            {message.transcriptionText && message.status !== MessageStatus.Transcribing && (
+              <div className="bg-black/10 rounded-lg p-2 border-l-2 border-white/30">
+                <p className="text-xs opacity-70 mb-1">Transcripción:</p>
+                <p className="text-sm whitespace-pre-wrap wrap-break-word">{message.transcriptionText}</p>
+              </div>
+            )}
+            
+            {/* Error message */}
+            {message.status === MessageStatus.Error && message.errorMessage && (
+              <div className="bg-red-500/20 rounded-lg p-2 border-l-2 border-red-300">
+                <p className="text-xs opacity-70 mb-1">Error:</p>
+                <p className="text-sm">{message.errorMessage}</p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="flex items-center justify-end gap-1 mt-1">

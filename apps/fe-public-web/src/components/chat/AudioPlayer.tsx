@@ -25,7 +25,7 @@ export function AudioPlayer({ message }: AudioPlayerProps) {
         mimeType,
         dataSize: message.audioData.length
       });
-      const blob = new Blob([message.audioData], { type: mimeType });
+      const blob = new Blob([new Uint8Array(message.audioData)], { type: mimeType });
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       
@@ -75,7 +75,7 @@ export function AudioPlayer({ message }: AudioPlayerProps) {
     <div className="flex items-center gap-3 min-w-[200px]">
       <button
         onClick={handlePlayPause}
-        className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center"
+        className="shrink-0 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center"
       >
         {isThisPlaying ? (
           <Pause className="w-5 h-5" fill="currentColor" />

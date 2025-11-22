@@ -11,6 +11,21 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Setup callback to update messages when they change
+  useEffect(() => {
+    const updateMessages = () => {
+      setMessages(chatService.getMessages());
+      scrollToBottom();
+    };
+    
+    chatService.setOnMessagesChange(updateMessages);
+    
+    // Cleanup
+    return () => {
+      chatService.setOnMessagesChange(() => {});
+    };
+  }, []);
+
   const scrollToBottom = () => {
     setTimeout(() => {
       if (scrollContainerRef.current) {
@@ -21,7 +36,6 @@ export function Chat() {
 
   const handleSendText = async (text: string) => {
     await chatService.sendTextMessage(text);
-    setMessages(chatService.getMessages());
     scrollToBottom();
   };
 
@@ -32,14 +46,13 @@ export function Chat() {
     blobUrl: string,
     mimeType?: string
   ) => {
-    await chatService.sendAudioMessage(audioData, fileName, duration, blobUrl, mimeType);
-    setMessages(chatService.getMessages());
+    // Start the process - the callback will update the UI as states change
+    chatService.sendAudioMessage(audioData, fileName, duration, blobUrl, mimeType);
     scrollToBottom();
   };
 
   const handleRetry = async (messageId: string) => {
     await chatService.retryMessage(messageId);
-    setMessages(chatService.getMessages());
   };
 
   useEffect(() => {
@@ -47,7 +60,7 @@ export function Chat() {
   }, [messages.length]);
 
   return (
-    <section id="chat" className="py-20 px-4 bg-gradient-to-b from-white to-gray-50">
+    <section id="chat" className="relative z-10 py-20 px-4 bg-linear-to-b from-white to-gray-50">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">

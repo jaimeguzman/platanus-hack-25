@@ -5,6 +5,7 @@ export enum MessageType {
 
 export enum MessageStatus {
   Sending = 'sending',
+  Transcribing = 'transcribing',
   Sent = 'sent',
   Error = 'error'
 }
@@ -20,6 +21,8 @@ export interface Message {
   timestamp: Date;
   status: MessageStatus;
   audioBlobUrl?: string; // Para reproducción directa
+  transcriptionText?: string; // Transcribed text from audio
+  errorMessage?: string; // Error message if processing failed
 }
 
 export interface ChatPayload {
@@ -31,4 +34,5 @@ export interface ChatPayload {
   audioBase64?: string;
   audioSize?: number;
   timestamp: string;
+  transcriptionText?: string; // Transcribed text from audio
 }
