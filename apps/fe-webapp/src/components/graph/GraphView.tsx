@@ -37,7 +37,27 @@ const CATEGORY_COLORS = [
   '#14B8A6', // Teal
 ];
 
-const GraphView: React.FC = () => {
+export interface NewNodeData {
+  node: {
+    id: string;
+    label: string;
+    type: string;
+    category?: string;
+    created_at?: string;
+  };
+  edges: {
+    source: string;
+    target: string;
+    weight: number;
+  }[];
+}
+
+interface GraphViewProps {
+  onNewNode?: (nodeData: NewNodeData) => void;
+  newNodeToAdd?: NewNodeData | null;
+}
+
+const GraphView: React.FC<GraphViewProps> = ({ onNewNode, newNodeToAdd }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -47,6 +67,7 @@ const GraphView: React.FC = () => {
   const [stats, setStats] = useState({ nodeCount: 0, edgeCount: 0 });
   const [categoryColorMap, setCategoryColorMap] = useState<Map<string, string>>(new Map());
   const simulationRef = useRef<d3.Simulation<D3Node, D3Edge> | null>(null);
+  const [newNodeId, setNewNodeId] = useState<string | null>(null);
 
   // Update dimensions on resize
   useEffect(() => {
@@ -183,6 +204,11 @@ const GraphView: React.FC = () => {
     
     svg.call(zoom.transform, initialTransform);
 
+    // Find the new node to center on it
+    const newNode = graphData.nodes.find(n => n.id === newNodeId);
+    const centerX = newNode && newNode.x ? newNode.x : width / 2;
+    const centerY = newNode && newNode.y ? newNode.y : height / 2;
+
     // Create force simulation
     const simulation = d3.forceSimulation<D3Node>(graphData.nodes)
       .force('link', d3.forceLink<D3Node, D3Edge>(graphData.edges)
@@ -194,8 +220,13 @@ const GraphView: React.FC = () => {
         .strength(-300)
         .distanceMax(400)
       )
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide<D3Node>().radius(d => (d.size || 8) + 10));
+      .force('center', d3.forceCenter(centerX, centerY))
+      .force('collision', d3.forceCollide<D3Node>().radius(d => {
+        // Give new node more space to avoid overlapping
+        const baseRadius = d.size || 8;
+        const isNewNode = d.id === newNodeId;
+        return (isNewNode ? baseRadius * 3 : baseRadius) + 15;
+      }));
 
     simulationRef.current = simulation;
 
@@ -209,17 +240,46 @@ const GraphView: React.FC = () => {
       .attr('stroke-width', d => 1 + (d.weight * 3));
 
     // Draw nodes
+    console.log('Rendering graph with newNodeId:', newNodeId);
+    console.log('Nodes:', graphData.nodes.map(n => n.id));
+    
     const node = g.append('g')
       .selectAll('circle')
       .data(graphData.nodes)
       .join('circle')
-      .attr('r', d => d.size || 8)
+      .attr('r', d => {
+        // Make new node significantly larger
+        const isNew = d.id === newNodeId;
+        console.log(`Node ${d.id}: isNew=${isNew}, newNodeId=${newNodeId}`);
+        if (isNew) {
+          return (d.size || 8) * 3;
+        }
+        return d.size || 8;
+      })
       .attr('fill', d => d.color || GRAPH_COLORS.memory)
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
+      .attr('stroke', d => d.id === newNodeId ? '#FFD700' : '#fff')
+      .attr('stroke-width', d => d.id === newNodeId ? 6 : 2)
       .style('cursor', 'pointer')
+      .style('filter', d => d.id === newNodeId ? 'drop-shadow(0 0 20px #FFD700)' : 'none')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .call(drag(simulation) as any);
+
+    // Add pulse animation to new node
+    if (newNodeId) {
+      node.filter(d => d.id === newNodeId)
+        .transition()
+        .duration(600)
+        .attr('r', d => (d.size || 8) * 4)
+        .transition()
+        .duration(600)
+        .attr('r', d => (d.size || 8) * 3)
+        .transition()
+        .duration(600)
+        .attr('r', d => (d.size || 8) * 3.5)
+        .transition()
+        .duration(600)
+        .attr('r', d => (d.size || 8) * 3);
+    }
 
     // Add labels
     const label = g.append('g')
@@ -227,10 +287,11 @@ const GraphView: React.FC = () => {
       .data(graphData.nodes)
       .join('text')
       .text(d => d.label.length > 30 ? d.label.substring(0, 30) + '...' : d.label)
-      .attr('font-size', 10)
-      .attr('dx', 12)
+      .attr('font-size', d => d.id === newNodeId ? 14 : 10)
+      .attr('font-weight', d => d.id === newNodeId ? 'bold' : 'normal')
+      .attr('dx', d => d.id === newNodeId ? 18 : 12)
       .attr('dy', 4)
-      .attr('fill', GRAPH_COLORS.text)
+      .attr('fill', d => d.id === newNodeId ? '#FFD700' : GRAPH_COLORS.text)
       .style('pointer-events', 'none')
       .style('user-select', 'none');
 
@@ -272,6 +333,7 @@ const GraphView: React.FC = () => {
       });
 
     // Update positions on simulation tick
+    let tickCount = 0;
     simulation.on('tick', () => {
       link
         .attr('x1', d => (typeof d.source === 'object' ? d.source.x : 0) || 0)
@@ -286,6 +348,27 @@ const GraphView: React.FC = () => {
       label
         .attr('x', d => d.x || 0)
         .attr('y', d => d.y || 0);
+
+      // Center on new node after simulation stabilizes
+      tickCount++;
+      if (newNodeId && tickCount === 50) {
+        const newNode = graphData.nodes.find(n => n.id === newNodeId);
+        if (newNode && newNode.x !== undefined && newNode.y !== undefined) {
+          console.log('Centering on new node at:', newNode.x, newNode.y);
+          
+          // Calculate transform to center the new node
+          const scale = initialScale * 1.5; // Zoom in a bit more
+          const transform = d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(scale)
+            .translate(-newNode.x, -newNode.y);
+          
+          // Animate to the new position
+          svg.transition()
+            .duration(1000)
+            .call(zoom.transform, transform);
+        }
+      }
     });
 
     // Drag behavior
@@ -322,6 +405,116 @@ const GraphView: React.FC = () => {
   const handleRefresh = () => {
     loadGraphData();
   };
+
+  // Function to add a new node dynamically
+  const addNewNode = useCallback((nodeData: NewNodeData) => {
+    setGraphData(prevData => {
+      // Check if node already exists
+      if (prevData.nodes.find(n => n.id === nodeData.node.id)) {
+        console.log('Node already exists, skipping');
+        return prevData;
+      }
+
+      // Get or create color for category
+      const updatedColorMap = new Map(categoryColorMap);
+      if (nodeData.node.category && !updatedColorMap.has(nodeData.node.category)) {
+        updatedColorMap.set(
+          nodeData.node.category,
+          CATEGORY_COLORS[updatedColorMap.size % CATEGORY_COLORS.length]
+        );
+        setCategoryColorMap(updatedColorMap);
+      }
+
+      // Create new D3 node
+      const newD3Node: D3Node = {
+        ...nodeData.node,
+        color: getNodeColor(nodeData.node.type, nodeData.node.category, updatedColorMap),
+        size: getNodeSize(nodeData.node.type),
+        // Position near center for animation
+        x: dimensions.width / 2,
+        y: dimensions.height / 2,
+      };
+
+      // Create new edges
+      const newEdges: D3Edge[] = nodeData.edges.map(edge => ({
+        source: edge.source,
+        target: edge.target,
+        weight: edge.weight,
+        strength: edge.weight * 0.5,
+      }));
+
+      // Filter out edges where target nodes don't exist
+      const validEdges = newEdges.filter(edge => {
+        const targetId = typeof edge.target === 'string' ? edge.target : edge.target.id;
+        return prevData.nodes.find(n => n.id === targetId);
+      });
+
+      // Update stats
+      setStats(prev => ({
+        nodeCount: prev.nodeCount + 1,
+        edgeCount: prev.edgeCount + validEdges.length,
+      }));
+
+      // Mark this as the new node for animation
+      setNewNodeId(nodeData.node.id);
+      
+      // Clear the highlight after animation (increased time)
+      setTimeout(() => setNewNodeId(null), 10000);
+
+      return {
+        nodes: [...prevData.nodes, newD3Node],
+        edges: [...prevData.edges, ...validEdges],
+      };
+    });
+  }, [categoryColorMap, dimensions, getNodeColor, getNodeSize]);
+
+  // Expose addNewNode function via callback
+  useEffect(() => {
+    if (onNewNode) {
+      // This is a workaround to expose the function
+      // In a real app, you'd use a ref or context
+      (window as unknown as { addGraphNode?: (nodeData: NewNodeData) => void }).addGraphNode = addNewNode;
+    }
+  }, [addNewNode, onNewNode]);
+
+  // Check for pending graph node after navigation
+  useEffect(() => {
+    const windowWithGraph = window as unknown as { 
+      addGraphNode?: (nodeData: NewNodeData) => void;
+      pendingGraphNode?: NewNodeData;
+    };
+    
+    // Check if there's a pending node to add
+    if (windowWithGraph.pendingGraphNode && graphData.nodes.length > 0) {
+      const pendingNode = windowWithGraph.pendingGraphNode;
+      
+      // Add the node after a short delay to ensure graph is rendered
+      setTimeout(() => {
+        addNewNode(pendingNode);
+        // Clear the pending node
+        delete windowWithGraph.pendingGraphNode;
+      }, 500);
+    }
+  }, [graphData.nodes.length, addNewNode]);
+
+  // Add new node from prop
+  useEffect(() => {
+    if (newNodeToAdd && graphData.nodes.length > 0) {
+      console.log('New node to add:', newNodeToAdd.node.id);
+      // Check if node doesn't already exist
+      const nodeExists = graphData.nodes.find(n => n.id === newNodeToAdd.node.id);
+      if (!nodeExists) {
+        console.log('Adding new node to graph');
+        setTimeout(() => {
+          addNewNode(newNodeToAdd);
+        }, 500);
+      } else {
+        console.log('Node already exists, setting as new node');
+        setNewNodeId(newNodeToAdd.node.id);
+        setTimeout(() => setNewNodeId(null), 10000);
+      }
+    }
+  }, [newNodeToAdd, graphData.nodes.length, graphData.nodes, addNewNode]);
 
   // Loading state
   if (isLoading) {

@@ -2,13 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, CheckCircle, XCircle, Mic, Square } from 'lucide-react';
-import { transcribeAudioDirect } from '@/services/transcriptionService';
+import { transcribeAudioDirect, type GraphNodeData } from '@/services/transcriptionService';
+import GraphView from '@/components/graph/GraphView';
 
 export default function TranscribePage() {
   const [file, setFile] = useState<File | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [error, setError] = useState('');
+  const [newGraphNode, setNewGraphNode] = useState<GraphNodeData | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
+  const graphRef = useRef<HTMLDivElement>(null);
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -37,6 +41,8 @@ export default function TranscribePage() {
     setIsTranscribing(true);
     setError('');
     setTranscription('');
+    setShowGraph(false);
+    setNewGraphNode(null);
 
     try {
       // Use the new transcription service that sends base64
@@ -50,6 +56,24 @@ export default function TranscribePage() {
       }
 
       setTranscription(transcriptionText);
+      
+      // Store the graph node data
+      if (result.graph_node) {
+        setNewGraphNode(result.graph_node);
+        // Show graph after a short delay
+        setTimeout(() => {
+          setShowGraph(true);
+          // Scroll to graph after it's rendered
+          setTimeout(() => {
+            if (graphRef.current) {
+              graphRef.current.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+              });
+            }
+          }, 100);
+        }, 500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -359,11 +383,30 @@ export default function TranscribePage() {
                 onClick={() => {
                   setTranscription('');
                   setFile(null);
+                  setShowGraph(false);
+                  setNewGraphNode(null);
                 }}
                 className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#2A2A2A] rounded-lg text-sm font-light transition-colors"
               >
                 Nueva transcripción
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Graph Visualization */}
+        {showGraph && newGraphNode && (
+          <div ref={graphRef} className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-8 scroll-mt-4">
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle className="w-6 h-6 text-[#4A5C4A]" />
+              <h2 className="text-xl font-light text-[#E5E5E5]">Grafo de Conocimiento</h2>
+              <span className="text-sm text-[#666666]">
+                (El nuevo nodo está destacado en dorado)
+              </span>
+            </div>
+
+            <div className="flex border border-[#2A2A2A] rounded-lg overflow-hidden" style={{ height: '700px' }}>
+              <GraphView newNodeToAdd={newGraphNode} />
             </div>
           </div>
         )}

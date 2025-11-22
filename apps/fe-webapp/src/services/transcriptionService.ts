@@ -10,6 +10,25 @@ export interface MemoryResponse {
   created_at: string;
 }
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  category?: string;
+  created_at?: string;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface GraphNodeData {
+  node: GraphNode;
+  edges: GraphEdge[];
+}
+
 export interface TranscriptionResponse {
   transcription: {
     text: string;
@@ -19,6 +38,7 @@ export interface TranscriptionResponse {
   };
   memory: MemoryResponse;
   filename?: string;
+  graph_node: GraphNodeData;
 }
 
 const STT_API_BASE_URL = process.env.NEXT_PUBLIC_STT_API_URL || 'http://localhost:8001';

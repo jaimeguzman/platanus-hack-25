@@ -4,9 +4,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { usePKMStore } from '@/stores/pkmStore';
 import { Mic, Square, Upload, FileAudio, Loader2, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { transcribeAudioDirect } from '@/services/transcriptionService';
+import { transcribeAudioDirect, type GraphNodeData } from '@/services/transcriptionService';
 
-const AudioTranscriber: React.FC = () => {
+interface AudioTranscriberProps {
+  onTranscriptionComplete?: () => void;
+}
+
+const AudioTranscriber: React.FC<AudioTranscriberProps> = ({ onTranscriptionComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -103,6 +107,22 @@ const AudioTranscriber: React.FC = () => {
       }
 
       setTranscription(transcriptionText);
+      
+      // Store graph node data globally for graph view
+      if (result.graph_node) {
+        const windowWithGraph = window as unknown as { 
+          addGraphNode?: (nodeData: GraphNodeData) => void;
+          pendingGraphNode?: GraphNodeData;
+        };
+        windowWithGraph.pendingGraphNode = result.graph_node;
+      }
+
+      // Close the modal if callback is provided
+      if (onTranscriptionComplete) {
+        setTimeout(() => {
+          onTranscriptionComplete();
+        }, 500);
+      }
     } catch (err) {
       console.error('Error transcribing audio:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al transcribir el audio';

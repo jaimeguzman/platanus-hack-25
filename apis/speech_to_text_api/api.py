@@ -52,10 +52,27 @@ class MemoryResponse(BaseModel):
     source: Optional[str]
     created_at: str
 
+class GraphNode(BaseModel):
+    id: str
+    label: str
+    type: str
+    category: Optional[str] = None
+    created_at: Optional[str] = None
+
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+    weight: float
+
+class GraphNodeData(BaseModel):
+    node: GraphNode
+    edges: List[GraphEdge]
+
 class TranscriptionResponse(BaseModel):
     transcription: Dict[str, Any] = Field(..., description="Raw transcription result from ElevenLabs")
     memory: MemoryResponse = Field(..., description="Created memory object")
     filename: Optional[str] = Field(None, description="Original filename")
+    graph_node: GraphNodeData = Field(..., description="Graph node data for visualization")
 
 class DirectTranscriptionResponse(BaseModel):
     transcription: Dict[str, Any] = Field(..., description="Raw transcription result from ElevenLabs")
@@ -80,7 +97,7 @@ async def transcribe_audio(request: TranscriptionRequest):
     This endpoint:
     1. Decodes base64 audio and transcribes using ElevenLabs API
     2. Stores the transcription in the RAG memory system
-    3. Returns both the transcription and memory details
+    3. Returns transcription, memory details, and graph node data
     """
     try:
         result = await transcription_service.transcribe_from_base64(
@@ -101,10 +118,18 @@ async def transcribe_audio(request: TranscriptionRequest):
             created_at=memory.get("created_at", ""),
         )
         
+        # Parse graph node data
+        graph_node_data = result["graph_node"]
+        graph_node = GraphNodeData(
+            node=GraphNode(**graph_node_data["node"]),
+            edges=[GraphEdge(**edge) for edge in graph_node_data["edges"]]
+        )
+        
         return TranscriptionResponse(
             transcription=result["transcription"],
             memory=memory_response,
             filename=result.get("filename"),
+            graph_node=graph_node,
         )
         
     except ValueError as e:
