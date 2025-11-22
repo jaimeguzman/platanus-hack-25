@@ -2,6 +2,13 @@
 .claude/
 .agents/
 .subagents/
+.mcp.json
+
+.cursor/
+.cursor/rules/*
+.cursor/mcp.json
+
+
 
 # Dependencies
 node_modules/
