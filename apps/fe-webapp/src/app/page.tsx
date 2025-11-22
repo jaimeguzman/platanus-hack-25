@@ -14,9 +14,10 @@ import { APP_CONFIG, UI_MESSAGES, FORMATTING, DEFAULT_TAGS, DEFAULT_VALUES, DEFA
 import { EMPTY_NOTE } from '@/data/mockData';
 
 export default function Home() {
+  // Hooks deben estar al inicio, sin condiciones
+  useNotes();
   const { viewMode, setViewMode, setCurrentNote, addNote, selectedPillar } = useNoteStore();
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  useNotes();
 
   const handleNewNote = () => {
     const now = new Date().toISOString();

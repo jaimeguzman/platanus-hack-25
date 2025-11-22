@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useNoteStore } from '@/stores/noteStore';
 import {
   LayoutDashboard,
@@ -29,12 +30,25 @@ import {
 } from '@/components/ui/sidebar';
 import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { getSupabaseClient } from '@/lib/supabase';
 
-const PILLARS = [
-  { id: 'career', label: 'Desarrollo de Carrera', icon: Briefcase },
-  { id: 'social', label: 'Social', icon: Users },
-  { id: 'hobby', label: 'Hobby', icon: Heart },
-] as const;
+const ICON_MAP: Record<string, typeof Briefcase> = {
+  'Desarrollo de Carrera': Briefcase,
+  'Social': Users,
+  'Hobby': Heart,
+};
+
+interface Pillar {
+  id: 'career' | 'social' | 'hobby';
+  label: string;
+  icon: typeof Briefcase;
+}
+
+const PILLAR_NAME_TO_ID: Record<string, 'career' | 'social' | 'hobby'> = {
+  'Desarrollo de Carrera': 'career',
+  'Social': 'social',
+  'Hobby': 'hobby',
+};
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -51,6 +65,39 @@ export function AppSidebar() {
     setShowFavoritesOnly,
     getFavoriteNotes,
   } = useNoteStore();
+  
+  const [pillars, setPillars] = useState<Pillar[]>([
+    { id: 'career', label: 'Desarrollo de Carrera', icon: Briefcase },
+    { id: 'social', label: 'Social', icon: Users },
+    { id: 'hobby', label: 'Hobby', icon: Heart },
+  ]);
+
+  useEffect(() => {
+    const loadPillars = async () => {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase
+        .from('projects')
+        .select('name')
+        .in('name', ['Desarrollo de Carrera', 'Social', 'Hobby'])
+        .order('name');
+      
+      if (data) {
+        const loadedPillars: Pillar[] = data
+          .map((p) => {
+            const id = PILLAR_NAME_TO_ID[p.name];
+            const icon = ICON_MAP[p.name] || Briefcase;
+            return id ? { id, label: p.name, icon } : null;
+          })
+          .filter((p): p is Pillar => p !== null);
+        
+        if (loadedPillars.length > 0) {
+          setPillars(loadedPillars);
+        }
+      }
+    };
+    
+    loadPillars();
+  }, []);
 
   const recentNotes = notes
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -148,12 +195,12 @@ export function AppSidebar() {
           <SidebarGroupLabel>Areas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {PILLARS.map((pillar) => {
+              {pillars.map((pillar) => {
                 const Icon = pillar.icon;
                 return (
                   <SidebarMenuItem key={pillar.id}>
                     <SidebarMenuButton
-                      onClick={() => setSelectedPillar(pillar.id as 'career' | 'social' | 'hobby')}
+                      onClick={() => setSelectedPillar(pillar.id)}
                       isActive={selectedPillar === pillar.id}
                       tooltip={pillar.label}
                     >

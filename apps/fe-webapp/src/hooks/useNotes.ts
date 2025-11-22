@@ -1,19 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNoteStore } from '@/stores/noteStore';
-import { fetchNotes } from '@/services/noteService';
+import { fetchNotes, searchNotes } from '@/services/noteService';
 import { NoteServiceError } from '@/lib/errors';
 
 export function useNotes() {
-  const { setNotes, notes } = useNoteStore();
+  const { setNotes, notes, searchQuery } = useNoteStore();
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const hasQuery = useMemo(() => searchQuery.trim().length > 0, [searchQuery]);
 
   useEffect(() => {
     const loadNotes = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const fetchedNotes = await fetchNotes();
+        const fetchedNotes = hasQuery 
+          ? await searchNotes(searchQuery)
+          : await fetchNotes();
         setNotes(fetchedNotes);
       } catch (err) {
         const noteError = err instanceof NoteServiceError 
@@ -26,8 +30,9 @@ export function useNotes() {
       }
     };
 
-    loadNotes();
-  }, [setNotes]);
+    const timeoutId = setTimeout(loadNotes, hasQuery ? 300 : 0);
+    return () => clearTimeout(timeoutId);
+  }, [setNotes, searchQuery, hasQuery]);
 
   return {
     notes,

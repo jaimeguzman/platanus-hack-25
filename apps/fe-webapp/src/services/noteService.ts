@@ -3,6 +3,38 @@ import type { Note } from '@/types/note';
 import { NoteServiceError, ERROR_CODES } from '@/lib/errors';
 import { DB_TABLES } from '@/constants';
 
+// Mapeo de pillar a project_id (cache)
+const PILLAR_TO_PROJECT_ID: Record<string, string> = {};
+const PROJECT_NAME_TO_PILLAR: Record<string, 'career' | 'social' | 'hobby'> = {
+  'Desarrollo de Carrera': 'career',
+  'Social': 'social',
+  'Hobby': 'hobby',
+};
+
+// Obtener project_id desde pillar
+async function getProjectIdByPillar(pillar: 'career' | 'social' | 'hobby'): Promise<string> {
+  if (PILLAR_TO_PROJECT_ID[pillar]) {
+    return PILLAR_TO_PROJECT_ID[pillar];
+  }
+  
+  const supabase = getSupabaseClient();
+  const projectName = pillar === 'career' ? 'Desarrollo de Carrera' : pillar === 'social' ? 'Social' : 'Hobby';
+  
+  const { data } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('name', projectName)
+    .limit(1)
+    .single();
+  
+  if (data?.id) {
+    PILLAR_TO_PROJECT_ID[pillar] = data.id;
+    return data.id;
+  }
+  
+  throw new NoteServiceError(`Project not found for pillar: ${pillar}`, ERROR_CODES.NOT_FOUND);
+}
+
 /**
  * Obtiene los backlinks (linkedNotes) de una nota desde note_backlinks
  */
@@ -199,15 +231,16 @@ export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedA
     const userId = firstUserRecord.id;
     const isFavorite = note.isFavorite ?? false;
     const pillar = note.pillar ?? 'career';
+    const projectId = await getProjectIdByPillar(pillar);
     
     // Crear la nota en la tabla notes
     const { data: noteData, error: noteError } = await supabase
       .from(DB_TABLES.NOTES)
       .insert({
         user_id: userId,
+        project_id: projectId,
         title: note.title,
         content: note.content,
-        pillar,
         is_favorite: isFavorite,
         created_at: now,
         updated_at: now,
@@ -273,7 +306,10 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<No
     // Actualizar campos directos de la tabla notes
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.content !== undefined) updateData.content = updates.content;
-    if (updates.pillar !== undefined) updateData.pillar = updates.pillar;
+    if (updates.pillar !== undefined) {
+      const projectId = await getProjectIdByPillar(updates.pillar);
+      updateData.project_id = projectId;
+    }
     if (updates.isFavorite !== undefined) updateData.is_favorite = updates.isFavorite;
 
     // Actualizar la nota en la tabla notes
@@ -414,10 +450,10 @@ export async function searchNotes(query: string): Promise<Note[]> {
   try {
     const supabase = getSupabaseClient();
     
-    // Buscar en notes y luego obtener datos completos desde notes_full
-    const { data: noteIds, error: searchError } = await supabase
-      .from(DB_TABLES.NOTES)
-      .select('id')
+    // Buscar en notes_full (incluye tags) y filtrar por título, contenido o tags
+    const { data: notesData, error: searchError } = await supabase
+      .from('notes_full')
+      .select('*')
       .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
       .order('updated_at', { ascending: false });
 
@@ -428,33 +464,26 @@ export async function searchNotes(query: string): Promise<Note[]> {
       );
     }
 
-    if (!noteIds || noteIds.length === 0) {
-      return [];
-    }
-
-    const ids = noteIds.map((n) => (n as { id: string }).id);
-
-    // Obtener datos completos desde notes_full
-    const { data: notesData, error: fetchError } = await supabase
-      .from('notes_full')
-      .select('*')
-      .in('id', ids)
-      .order('updated_at', { ascending: false });
-
-    if (fetchError) {
-      throw new NoteServiceError(
-        `Failed to fetch search results: ${fetchError.message}`,
-        ERROR_CODES.SEARCH_FAILED,
-      );
-    }
-
     if (!notesData) {
       return [];
     }
 
+    // Filtrar por tags si el query coincide (búsqueda en memoria sobre tags)
+    const queryLower = query.toLowerCase();
+    const filteredByTags = notesData.filter((note) => {
+      const tags = Array.isArray(note.tags) ? note.tags : [];
+      return tags.some((tag: string) => tag.toLowerCase().includes(queryLower));
+    });
+
+    // Combinar resultados y eliminar duplicados
+    const allResults = [...notesData, ...filteredByTags];
+    const uniqueResults = Array.from(
+      new Map(allResults.map((note) => [note.id, note])).values()
+    );
+
     // Obtener backlinks para todas las notas
     const notesWithBacklinks = await Promise.all(
-      notesData.map(async (note) => {
+      uniqueResults.map(async (note) => {
         const noteRecord = note as Record<string, unknown>;
         const noteId = noteRecord.id as string;
         const linkedNotes = await fetchLinkedNotes(noteId);
@@ -492,8 +521,11 @@ function mapDbNoteToNote(dbNote: Record<string, unknown>): Note {
     ? dbNote.is_favorite 
     : dbNote.is_pinned === true; // Fallback a is_pinned si is_favorite no existe
 
-  // pillar tiene un valor por defecto si no existe
-  const pillar = (dbNote.pillar as 'career' | 'social' | 'hobby') || 'career';
+  // Mapear project_name a pillar, o usar pillar si existe (compatibilidad)
+  const projectName = dbNote.project_name as string | undefined;
+  const pillar = projectName && PROJECT_NAME_TO_PILLAR[projectName]
+    ? PROJECT_NAME_TO_PILLAR[projectName]
+    : ((dbNote.pillar as 'career' | 'social' | 'hobby') || 'career');
 
   return {
     id: dbNote.id as string,
