@@ -36,12 +36,14 @@ transcription_service = TranscriptionService()
 
 # Pydantic models for request/response
 class TranscriptionRequest(BaseModel):
-    audio_url: str = Field(..., description="URL of the audio file to transcribe")
+    audio_base64: str = Field(..., description="Base64 encoded audio file to transcribe")
+    filename: Optional[str] = Field(None, description="Original filename for the audio file")
     category: Optional[str] = Field(None, description="Optional category for the memory")
     source: Optional[str] = Field(None, description="Optional source identifier")
 
 class DirectTranscriptionRequest(BaseModel):
-    audio_url: str = Field(..., description="URL of the audio file to transcribe")
+    audio_base64: str = Field(..., description="Base64 encoded audio file to transcribe")
+    filename: Optional[str] = Field(None, description="Original filename for the audio file")
 
 class MemoryResponse(BaseModel):
     id: int
@@ -53,11 +55,11 @@ class MemoryResponse(BaseModel):
 class TranscriptionResponse(BaseModel):
     transcription: Dict[str, Any] = Field(..., description="Raw transcription result from ElevenLabs")
     memory: MemoryResponse = Field(..., description="Created memory object")
-    audio_url: str = Field(..., description="Original audio URL")
+    filename: Optional[str] = Field(None, description="Original filename")
 
 class DirectTranscriptionResponse(BaseModel):
     transcription: Dict[str, Any] = Field(..., description="Raw transcription result from ElevenLabs")
-    audio_url: str = Field(..., description="Original audio URL")
+    filename: Optional[str] = Field(None, description="Original filename")
 
 class SearchResult(BaseModel):
     memory: MemoryResponse
@@ -73,16 +75,17 @@ async def health_check():
 @app.post("/transcribe", response_model=TranscriptionResponse)
 async def transcribe_audio(request: TranscriptionRequest):
     """
-    Transcribe audio from URL and store in RAG memory.
+    Transcribe audio from base64 and store in RAG memory.
     
     This endpoint:
-    1. Downloads and transcribes the audio using ElevenLabs API
+    1. Decodes base64 audio and transcribes using ElevenLabs API
     2. Stores the transcription in the RAG memory system
     3. Returns both the transcription and memory details
     """
     try:
-        result = await transcription_service.transcribe_from_url(
-            audio_url=request.audio_url,
+        result = await transcription_service.transcribe_from_base64(
+            audio_base64=request.audio_base64,
+            filename=request.filename,
             category=request.category,
             source=request.source,
             language_code="es",
@@ -101,7 +104,7 @@ async def transcribe_audio(request: TranscriptionRequest):
         return TranscriptionResponse(
             transcription=result["transcription"],
             memory=memory_response,
-            audio_url=result["audio_url"],
+            filename=result.get("filename"),
         )
         
     except ValueError as e:
@@ -113,19 +116,20 @@ async def transcribe_audio(request: TranscriptionRequest):
 @app.post("/transcribe/direct", response_model=DirectTranscriptionResponse)
 async def transcribe_audio_direct(request: DirectTranscriptionRequest):
     """
-    Transcribe audio from URL without storing in memory.
+    Transcribe audio from base64 without storing in memory.
     
     This endpoint only transcribes the audio and returns the result
     without storing it in the RAG memory system.
     """
     try:
-        transcription_result = await transcription_service.transcribe_from_url_direct(
-            audio_url=request.audio_url,
+        transcription_result = await transcription_service.transcribe_from_base64_direct(
+            audio_base64=request.audio_base64,
+            filename=request.filename,
         )
         
         return DirectTranscriptionResponse(
             transcription=transcription_result,
-            audio_url=request.audio_url,
+            filename=request.filename,
         )
         
     except ValueError as e:
