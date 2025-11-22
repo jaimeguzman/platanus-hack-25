@@ -8,21 +8,21 @@ export interface GraphNode {
   type: string;
   category?: string;
   created_at?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface GraphEdge {
   source: string;
   target: string;
   weight: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface GraphMetadata {
   node_count: number;
   edge_count: number;
   categories?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface GraphExportResponse {
@@ -58,12 +58,12 @@ export async function fetchGraphData(
 
   // Convert node IDs to strings for D3
   return {
-    nodes: data.nodes.map((node: any) => ({
+    nodes: data.nodes.map((node: GraphNode) => ({
       ...node,
       id: String(node.id),
       type: 'memory', // Default type
     })),
-    edges: data.edges.map((edge: any) => ({
+    edges: data.edges.map((edge: GraphEdge) => ({
       ...edge,
       source: String(edge.source),
       target: String(edge.target),
@@ -79,7 +79,7 @@ export async function fetchGraphData(
 /**
  * Get graph statistics
  */
-export async function fetchGraphStatistics(): Promise<any> {
+export async function fetchGraphStatistics(): Promise<GraphMetadata> {
   const response = await fetch(`${RAG_API_BASE_URL}/statistics`);
 
   if (!response.ok) {

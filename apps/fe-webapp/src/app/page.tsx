@@ -6,7 +6,6 @@ import Sidebar from '@/components/sidebar/Sidebar';
 import NoteEditor from '@/components/editor/NoteEditor';
 import GraphView from '@/components/graph/GraphView';
 import AudioTranscriber from '@/components/notes/AudioTranscriber';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
