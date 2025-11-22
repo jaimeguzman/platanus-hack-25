@@ -274,10 +274,10 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   // Computed
   getFilteredNotes: () => {
-    const { notes, searchQuery, selectedPillar, showFavoritesOnly } = get();
-    // Si hay query, las notas ya vienen filtradas desde Supabase
-    const notesToFilter = searchQuery.trim() ? notes : notes;
-    return notesToFilter.filter((note) => {
+    const { notes, selectedPillar, showFavoritesOnly } = get();
+    // Las notas ya vienen filtradas por búsqueda desde Supabase si hay searchQuery
+    // Solo aplicamos filtros adicionales de pilar y favoritos
+    return notes.filter((note) => {
       const matchesPillar =
         selectedPillar === 'all' || note.pillar === selectedPillar;
       const matchesFavorites = !showFavoritesOnly || note.isFavorite;

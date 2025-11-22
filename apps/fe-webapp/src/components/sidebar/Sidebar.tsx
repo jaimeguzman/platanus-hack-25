@@ -59,11 +59,11 @@ export function AppSidebar() {
     setSelectedPillar,
     searchQuery,
     setSearchQuery,
-    notes,
     setCurrentNote,
     showFavoritesOnly,
     setShowFavoritesOnly,
     getFavoriteNotes,
+    getFilteredNotes,
   } = useNoteStore();
   
   const [pillars, setPillars] = useState<Pillar[]>([
@@ -82,7 +82,7 @@ export function AppSidebar() {
         .order('name');
       
       if (data) {
-        const loadedPillars: Pillar[] = data
+        const loadedPillars: Pillar[] = (data as Array<{ name: string }>)
           .map((p) => {
             const id = PILLAR_NAME_TO_ID[p.name];
             const icon = ICON_MAP[p.name] || Briefcase;
@@ -99,7 +99,9 @@ export function AppSidebar() {
     loadPillars();
   }, []);
 
-  const recentNotes = notes
+  const filteredNotes = getFilteredNotes();
+  
+  const recentNotes = filteredNotes
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, APP_CONFIG.RECENT_NOTES_LIMIT);
 
@@ -197,11 +199,19 @@ export function AppSidebar() {
             <SidebarMenu>
               {pillars.map((pillar) => {
                 const Icon = pillar.icon;
+                const isActive = selectedPillar === pillar.id;
                 return (
                   <SidebarMenuItem key={pillar.id}>
                     <SidebarMenuButton
-                      onClick={() => setSelectedPillar(pillar.id)}
-                      isActive={selectedPillar === pillar.id}
+                      onClick={() => {
+                        // Toggle: si ya está seleccionado, deseleccionar (mostrar todas)
+                        if (isActive) {
+                          setSelectedPillar('all');
+                        } else {
+                          setSelectedPillar(pillar.id);
+                        }
+                      }}
+                      isActive={isActive}
                       tooltip={pillar.label}
                     >
                       <Icon />

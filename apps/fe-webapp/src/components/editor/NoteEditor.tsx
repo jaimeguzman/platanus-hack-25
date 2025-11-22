@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
 import { useNoteStore } from '@/stores/noteStore';
 import { Button } from '@/components/ui/button';

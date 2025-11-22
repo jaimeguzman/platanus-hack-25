@@ -2,8 +2,8 @@
 // NO STATIC FALLBACKS, NO HARDCODED VALUES, NO MAGIC NUMBERS
 
 export const DEFAULT_TAGS = {
-  VOICE_NOTE: ['voz', 'audio'],
-} as const;
+  VOICE_NOTE: ['voz', 'audio'] as string[],
+};
 
 export const DEFAULT_VALUES = {
   // Valores por defecto para notas

@@ -13,9 +13,7 @@ import {
   PILLAR_COLORS,
   PILLAR_COLORS_SVG,
   D3_SIMULATION,
-  D3_ZOOM,
   ANIMATION_DURATION,
-  UI_DIMENSIONS,
 } from '@/constants';
 
 type InteractionMode = 'nodes' | 'pan' | 'zoom';
@@ -39,13 +37,14 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
 }
 
 export function GraphView() {
-  const { notes, setCurrentNote, setViewMode } = useNoteStore();
+  const { notes, getFilteredNotes, setCurrentNote, setViewMode } = useNoteStore();
+  const filteredNotes = getFilteredNotes();
   const { theme, resolvedTheme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('nodes');
   const [mounted, setMounted] = useState(false);
 
@@ -66,9 +65,9 @@ export function GraphView() {
     const centerY = defaultHeight / 2;
     const radius = Math.min(defaultWidth, defaultHeight) * 0.3; // 30% del tamaño menor
     
-    const graphNodes: GraphNode[] = notes.map((note, index) => {
+    const graphNodes: GraphNode[] = filteredNotes.map((note, index) => {
       // Distribución circular inicial para mejor visualización
-      const angle = (index / notes.length) * D3_SIMULATION.FULL_CIRCLE_RADIANS;
+      const angle = (index / filteredNotes.length) * D3_SIMULATION.FULL_CIRCLE_RADIANS;
       const x = Math.cos(angle) * radius + centerX;
       const y = Math.sin(angle) * radius + centerY;
 
@@ -85,8 +84,8 @@ export function GraphView() {
     const graphLinks: GraphLink[] = [];
     
     // Crear conexiones basadas en tags compartidos
-    notes.forEach((note, i) => {
-      notes.slice(i + 1).forEach((otherNote) => {
+    filteredNotes.forEach((note, i) => {
+      filteredNotes.slice(i + 1).forEach((otherNote) => {
         const sharedTags = note.tags.filter((tag) =>
           otherNote.tags.includes(tag),
         );
@@ -101,7 +100,7 @@ export function GraphView() {
       // Crear conexiones basadas en linkedNotes
       if (note.linkedNotes) {
         note.linkedNotes.forEach((linkedId) => {
-          if (notes.some((n) => n.id === linkedId)) {
+          if (filteredNotes.some((n) => n.id === linkedId)) {
             graphLinks.push({
               source: note.id,
               target: linkedId,
@@ -112,7 +111,7 @@ export function GraphView() {
     });
 
     return { nodes: graphNodes, links: graphLinks };
-  }, [notes]);
+  }, [filteredNotes]);
 
   // Inicializar y actualizar la simulación de D3
   useEffect(() => {
@@ -262,7 +261,7 @@ export function GraphView() {
         return isDarkMode ? colors.dark : colors.light;
       })
       .attr('stroke-width', isDarkMode ? '2' : '1')
-      .attr('class', (d) => {
+      .attr('class', () => {
         const cursorClass = interactionMode === 'nodes' ? 'cursor-move' : 'cursor-pointer';
         return `${cursorClass} transition-all hover:opacity-80`;
       })
@@ -364,7 +363,7 @@ export function GraphView() {
 
     if (interactionMode === 'zoom') {
       // Modo zoom: permite zoom con rueda y arrastre
-      zoomRef.current.filter(null);
+      zoomRef.current.filter(() => true);
     } else if (interactionMode === 'pan') {
       // Modo pan: solo permite arrastre, sin zoom con rueda
       zoomRef.current.filter((event) => {
@@ -401,10 +400,8 @@ export function GraphView() {
       .scale(APP_CONFIG.ZOOM_INITIAL_SCALE)
       .translate(-width / 2, -height / 2);
     
-    svg.transition().duration(ANIMATION_DURATION.ZOOM_RESET).call(
-      zoomRef.current.transform,
-      initialTransform,
-    );
+    // Solución simple: usar exactamente la misma técnica que en la inicialización (línea 235)
+    svg.call(zoomRef.current.transform, initialTransform);
   };
 
   const handleZoomIn = () => {
