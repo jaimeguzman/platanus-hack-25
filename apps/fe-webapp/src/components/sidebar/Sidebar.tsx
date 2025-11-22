@@ -58,7 +58,7 @@ const Sidebar: React.FC = () => {
     const newNoteId = addNote({
       title: DEFAULT_VALUES.note.title,
       content: DEFAULT_VALUES.note.content,
-      tags: DEFAULT_VALUES.note.tags,
+      tags: [...DEFAULT_VALUES.note.tags],
       projectId: selectedProjectId ?? undefined
     });
     setActiveNote(newNoteId);

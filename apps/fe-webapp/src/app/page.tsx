@@ -29,7 +29,7 @@ export default function Home() {
     const newNoteId = addNote({
       title: DEFAULT_VALUES.note.title,
       content: DEFAULT_VALUES.note.content,
-      tags: DEFAULT_VALUES.note.tags
+      tags: [...DEFAULT_VALUES.note.tags]
     });
     setActiveNote(newNoteId);
   }, []);
