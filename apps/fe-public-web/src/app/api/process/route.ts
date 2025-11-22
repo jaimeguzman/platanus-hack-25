@@ -170,7 +170,6 @@ export async function POST(req: Request) {
       tools,
       toolChoice: 'required',
       temperature: 0,
-      maxTokens: 64,
     });
 
     // Get first tool call decision
@@ -273,7 +272,7 @@ function streamAnswerWithRag(input: {
         'Reglas:',
         '- Idioma: español neutro. Tono claro, profesional y cercano.',
         '- Estilo: breve (2–4 frases), directo. Si hay pasos, usa viñetas.',
-        "- No inventes. Si el contexto es insuficiente, dilo y sugiere: “¿Quieres que lo guarde como nota?”",
+        "- No inventes. Si el contexto es insuficiente, dilo y sugiere: \"¿Quieres que lo guarde como nota?\"",
         '- Si aplica, menciona relaciones o conexiones detectadas en el contexto.',
         '- Cuando corresponda, incluye una mención breve a la fuente entre paréntesis (ej: id o extracto).',
         '- Respeta la privacidad: no uses datos externos ni asumas información.',
@@ -283,7 +282,6 @@ function streamAnswerWithRag(input: {
         `Contexto:\n${context || 'No hay contexto disponible.'}\n\n` +
         `${input.needsCitation ? 'Incluye una mención breve a la fuente.' : ''}`,
       temperature: 0.2,
-      maxTokens: 512,
     });
     // Enviar SOLO el texto en streaming (sin eventos), para que el cliente lo muestre limpio
     return new Response(result.textStream, {
@@ -355,7 +353,7 @@ async function answerWithRag(input: {
       'Reglas:',
       '- Idioma: español neutro. Tono claro, profesional y cercano.',
       '- Estilo: breve (2–4 frases), directo. Si hay pasos, usa viñetas.',
-      "- No inventes. Si el contexto es insuficiente, dilo y sugiere: “¿Quieres que lo guarde como nota?”",
+      "- No inventes. Si el contexto es insuficiente, dilo y sugiere: \"¿Quieres que lo guarde como nota?\"",
       '- Si aplica, menciona relaciones o conexiones detectadas en el contexto.',
       '- Cuando corresponda, incluye una mención breve a la fuente entre paréntesis (ej: id o extracto).',
       '- Respeta la privacidad: no uses datos externos ni asumas información.',
@@ -365,7 +363,6 @@ async function answerWithRag(input: {
       `Contexto:\n${context || 'No hay contexto disponible.'}\n\n` +
       `${input.needsCitation ? 'Incluye una mención breve a la fuente.' : ''}`,
     temperature: 0.2,
-    maxTokens: 512,
   });
 
   return {

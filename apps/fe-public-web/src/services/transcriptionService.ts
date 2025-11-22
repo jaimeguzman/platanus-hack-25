@@ -14,7 +14,7 @@ export interface TranscriptionResponse {
     text: string;
     language?: string;
     confidence?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   filename?: string;
 }

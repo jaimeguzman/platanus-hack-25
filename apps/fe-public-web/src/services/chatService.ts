@@ -8,14 +8,11 @@ class ChatService {
   private static instance: ChatService;
   private messages: Message[] = [];
   private apiBaseUrl: string | null = null;
-  private ragApiUrl: string | null = null;
   private onMessagesChange?: () => void;
 
   private constructor() {
     // Initialize with speech-to-text API URL
     this.apiBaseUrl = env.speechToTextApiUrl;
-    // RAG API URL
-    this.ragApiUrl = env.ragApiUrl || null;
   }
 
   static getInstance(): ChatService {
@@ -290,10 +287,10 @@ class ChatService {
         } else {
           throw new Error(`Direct endpoint not available: ${response.status}`);
         }
-      } catch (_e) {
+      } catch {
         // Fallback to api-sst multipart /speech-to-text
         console.log('Falling back to /speech-to-text (multipart)');
-        const blob = new Blob([message.audioData], {
+        const blob = new Blob([new Uint8Array(message.audioData)], {
           type: message.audioMimeType || 'audio/webm',
         });
         const file = new File(
@@ -332,7 +329,7 @@ class ChatService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: result.transcription?.text || '',
+          text: transcribedText || '',
           source: message.audioFileName || 'web_chat_audio',
           category: 'audio_transcription'
         }),
