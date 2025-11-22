@@ -42,7 +42,7 @@ class RagConfig:
     max_search_limit: int = 100
     
     # Chunking settings
-    chunk_size_words: int = 400  # Number of words per chunk
+    chunk_size_words: int = 100  # Number of words per chunk
     chunk_overlap_words: int = 80  # Number of overlapping words between chunks
     
     # Logging

@@ -247,7 +247,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="font-light">Transcripción de Audio</DialogTitle>
           </DialogHeader>
-          <AudioTranscriber />
+          <AudioTranscriber onTranscriptionComplete={() => setShowAudioTranscriber(false)} />
         </DialogContent>
       </Dialog>
     </div>

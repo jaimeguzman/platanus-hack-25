@@ -15,7 +15,10 @@ sys.path.insert(0, str(project_root))
 
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from services.rag_memory.database import engine
+
+# Import database module directly to avoid __init__.py issues
+sys.path.insert(0, str(project_root / "apis" / "rag_memory"))
+from database import engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

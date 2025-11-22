@@ -2,13 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, CheckCircle, XCircle, Mic, Square } from 'lucide-react';
+import { transcribeAudioDirect, type GraphNodeData } from '@/services/transcriptionService';
+import GraphView from '@/components/graph/GraphView';
 
 export default function TranscribePage() {
   const [file, setFile] = useState<File | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [error, setError] = useState('');
-  const [language, setLanguage] = useState('es');
+  const [newGraphNode, setNewGraphNode] = useState<GraphNodeData | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
+  const graphRef = useRef<HTMLDivElement>(null);
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -37,26 +41,39 @@ export default function TranscribePage() {
     setIsTranscribing(true);
     setError('');
     setTranscription('');
+    setShowGraph(false);
+    setNewGraphNode(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('language', language);
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-      const response = await fetch(`${apiUrl}/speech-to-text`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error en la transcripción');
+      // Use the new transcription service that sends base64
+      const result = await transcribeAudioDirect(file, file.name);
+      
+      // Extract the transcription text
+      const transcriptionText = result.transcription.text || '';
+      
+      if (!transcriptionText.trim()) {
+        throw new Error('La transcripción está vacía. Por favor intenta de nuevo.');
       }
 
-      const data = await response.json();
-      setTranscription(data.text);
+      setTranscription(transcriptionText);
+      
+      // Store the graph node data
+      if (result.graph_node) {
+        setNewGraphNode(result.graph_node);
+        // Show graph after a short delay
+        setTimeout(() => {
+          setShowGraph(true);
+          // Scroll to graph after it's rendered
+          setTimeout(() => {
+            if (graphRef.current) {
+              graphRef.current.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+              });
+            }
+          }, 100);
+        }, 500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -176,7 +193,7 @@ export default function TranscribePage() {
             Speech-to-Text Demo
           </h1>
           <p className="text-[#888888] font-light">
-            Sube un archivo de audio y obtén la transcripción usando OpenAI Whisper
+            Sube un archivo de audio y obtén la transcripción usando ElevenLabs
           </p>
         </div>
 
@@ -306,29 +323,6 @@ export default function TranscribePage() {
             )}
           </div>
 
-          {/* Language Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-light text-[#B8B8B8] mb-3">
-              Idioma del audio (opcional)
-            </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-[#E5E5E5] font-light focus:outline-none focus:border-[#4A5C4A] focus:ring-1 focus:ring-[#4A5C4A] transition-all"
-            >
-              <option value="">Auto-detectar</option>
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="it">Italiano</option>
-              <option value="pt">Português</option>
-              <option value="zh">中文</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-            </select>
-          </div>
-
           {/* Transcribe Button */}
           <button
             onClick={handleTranscribe}
@@ -353,11 +347,11 @@ export default function TranscribePage() {
         {error && (
           <div className="bg-[#8B4B4B] bg-opacity-20 border border-[#8B4B4B] rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-[#8B4B4B] flex-shrink-0 mt-0.5" />
+              <XCircle className="w-5 h-5 text-[#8B4B4B] shrink-0 mt-0.5" />
               <div>
                 <p className="text-[#8B4B4B] font-light">{error}</p>
                 <p className="text-xs text-[#666666] mt-1">
-                  Asegúrate de que la API esté corriendo en {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
+                  Asegúrate de que la API de transcripción esté corriendo en {process.env.NEXT_PUBLIC_STT_API_URL || 'http://localhost:8001'}
                 </p>
               </div>
             </div>
@@ -389,11 +383,30 @@ export default function TranscribePage() {
                 onClick={() => {
                   setTranscription('');
                   setFile(null);
+                  setShowGraph(false);
+                  setNewGraphNode(null);
                 }}
                 className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#2A2A2A] rounded-lg text-sm font-light transition-colors"
               >
                 Nueva transcripción
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Graph Visualization */}
+        {showGraph && newGraphNode && (
+          <div ref={graphRef} className="bg-[#141414] border border-[#2A2A2A] rounded-xl p-8 scroll-mt-4">
+            <div className="flex items-center gap-3 mb-4">
+              <CheckCircle className="w-6 h-6 text-[#4A5C4A]" />
+              <h2 className="text-xl font-light text-[#E5E5E5]">Grafo de Conocimiento</h2>
+              <span className="text-sm text-[#666666]">
+                (El nuevo nodo está destacado en dorado)
+              </span>
+            </div>
+
+            <div className="flex border border-[#2A2A2A] rounded-lg overflow-hidden" style={{ height: '700px' }}>
+              <GraphView newNodeToAdd={newGraphNode} />
             </div>
           </div>
         )}
@@ -404,9 +417,9 @@ export default function TranscribePage() {
           <ul className="space-y-2 text-sm text-[#888888] font-light">
             <li>• Formatos soportados: MP3, WAV, M4A, FLAC, OGG, WEBM</li>
             <li>• Tamaño máximo: 25MB</li>
-            <li>• Motor: OpenAI Whisper</li>
-            <li>• Idiomas soportados: Más de 50 idiomas</li>
-            <li>• API Endpoint: {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}</li>
+            <li>• Motor: ElevenLabs Scribe</li>
+            <li>• Idiomas soportados: Múltiples idiomas</li>
+            <li>• API Endpoint: {process.env.NEXT_PUBLIC_STT_API_URL || 'http://localhost:8001'}</li>
           </ul>
         </div>
       </div>
