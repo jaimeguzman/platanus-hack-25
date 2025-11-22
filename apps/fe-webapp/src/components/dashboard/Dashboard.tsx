@@ -18,7 +18,8 @@ export function Dashboard() {
     const socialNotes = notes.filter((n) => n.pillar === 'social').length;
     const hobbyNotes = notes.filter((n) => n.pillar === 'hobby').length;
     const totalTags = new Set(notes.flatMap((n) => n.tags)).size;
-    const recentNotes = notes
+    // Usar filteredNotes para las notas recientes (respetando el filtro de pilar)
+    const recentNotes = filteredNotes
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, APP_CONFIG.DASHBOARD_RECENT_NOTES_LIMIT);
 
@@ -30,7 +31,7 @@ export function Dashboard() {
       totalTags,
       recentNotes,
     };
-  }, [notes]);
+  }, [notes, filteredNotes]);
 
   const handleNoteClick = (noteId: string) => {
     const note = notes.find((n) => n.id === noteId);

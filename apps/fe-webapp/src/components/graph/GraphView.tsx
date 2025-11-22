@@ -39,7 +39,8 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
 }
 
 export function GraphView() {
-  const { notes, setCurrentNote, setViewMode } = useNoteStore();
+  const { notes, getFilteredNotes, setCurrentNote, setViewMode } = useNoteStore();
+  const filteredNotes = getFilteredNotes();
   const { theme, resolvedTheme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,9 +67,9 @@ export function GraphView() {
     const centerY = defaultHeight / 2;
     const radius = Math.min(defaultWidth, defaultHeight) * 0.3; // 30% del tamaño menor
     
-    const graphNodes: GraphNode[] = notes.map((note, index) => {
+    const graphNodes: GraphNode[] = filteredNotes.map((note, index) => {
       // Distribución circular inicial para mejor visualización
-      const angle = (index / notes.length) * D3_SIMULATION.FULL_CIRCLE_RADIANS;
+      const angle = (index / filteredNotes.length) * D3_SIMULATION.FULL_CIRCLE_RADIANS;
       const x = Math.cos(angle) * radius + centerX;
       const y = Math.sin(angle) * radius + centerY;
 
@@ -85,8 +86,8 @@ export function GraphView() {
     const graphLinks: GraphLink[] = [];
     
     // Crear conexiones basadas en tags compartidos
-    notes.forEach((note, i) => {
-      notes.slice(i + 1).forEach((otherNote) => {
+    filteredNotes.forEach((note, i) => {
+      filteredNotes.slice(i + 1).forEach((otherNote) => {
         const sharedTags = note.tags.filter((tag) =>
           otherNote.tags.includes(tag),
         );
@@ -101,7 +102,7 @@ export function GraphView() {
       // Crear conexiones basadas en linkedNotes
       if (note.linkedNotes) {
         note.linkedNotes.forEach((linkedId) => {
-          if (notes.some((n) => n.id === linkedId)) {
+          if (filteredNotes.some((n) => n.id === linkedId)) {
             graphLinks.push({
               source: note.id,
               target: linkedId,
@@ -112,7 +113,7 @@ export function GraphView() {
     });
 
     return { nodes: graphNodes, links: graphLinks };
-  }, [notes]);
+  }, [filteredNotes]);
 
   // Inicializar y actualizar la simulación de D3
   useEffect(() => {
