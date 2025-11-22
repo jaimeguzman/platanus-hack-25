@@ -128,10 +128,11 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  isActive={showFavoritesOnly}
+                  isActive={false}
                   tooltip={`Favoritos (${getFavoriteNotes().length})`}
+                  className="data-[active=true]:bg-transparent data-[active=true]:font-normal data-[active=true]:text-sidebar-foreground"
                 >
-                  <Star className={showFavoritesOnly ? 'fill-yellow-500 text-yellow-500' : ''} />
+                  <Star />
                   <span>Favoritos</span>
                   <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-sidebar-primary text-xs text-sidebar-primary-foreground">
                     {getFavoriteNotes().length}
