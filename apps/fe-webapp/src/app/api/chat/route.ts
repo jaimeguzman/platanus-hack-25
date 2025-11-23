@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         }>;
 
         // Take top 3 most relevant memories
-        topResults = searchResults.filter(r => r.similarity_score > 0.78).slice(0, 3);
+        topResults = searchResults.slice(0, 3);
         context = topResults
           .map((r) => {
             const createdDate = new Date(r.memory.created_at).toLocaleDateString('es-ES', {
