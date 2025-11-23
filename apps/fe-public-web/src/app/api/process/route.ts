@@ -3,43 +3,47 @@ import { generateText, streamText } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-
 type ProcessRequest = {
   text: string;
   category?: string | null;
   source?: string | null;
-  force_action?: 'save' | 'ask' | null;
 };
 
 const RAG_API_URL =
   process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhost:8000';
 
-function classifyIntentHeuristic(text: string): 'ask' | 'save' | 'none' {
-  const t = text.trim().toLowerCase();
-  if (!t) return 'none';
-  const questionWords = [
-    '¿', 'que', 'qué', 'quien', 'quién', 'cuando', 'cuándo',
-    'donde', 'dónde', 'como', 'cómo', 'por qué', 'porque',
-    'what', 'who', 'when', 'where', 'how', 'why'
-  ];
-  const saveWords = [
-    'guarda', 'guardar', 'anota', 'anotar', 'recuerda', 'recordar',
-    'nota:', 'save', 'remember', 'note:'
-  ];
-  if (t.includes('?') || questionWords.some(w => t.startsWith(w))) {
-    return 'ask';
-  }
-  if (saveWords.some(w => t.includes(w))) {
-    return 'save';
-  }
-  // Por defecto, actuar como asistente conversacional (ask)
-  return 'ask';
-}
-
+  const CATEGORIES =[
+  "Salud",
+  "Ejercicio y Deporte",
+  "Trabajo / Laboral",
+  "Estudios / Aprendizaje",
+  "Finanzas",
+  "Relaciones Amorosas",
+  "Familia",
+  "Amistades",
+  "Vida Social",
+  "Hogar y Organización",
+  "Alimentación",
+  "Estado de Ánimo / Emociones",
+  "Proyectos Personales",
+  "Viajes",
+  "Hobbies",
+  "Crecimiento Personal",
+  "Tecnología / Gadgets",
+  "Creatividad / Arte",
+  "Espiritualidad",
+  "Eventos Importantes",
+  "Metas y Hábitos",
+  "Sueño",
+  "Mascotas",
+  "Compras",
+  "Tiempo Libre / Entretenimiento"
+] as const;
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ProcessRequest;
     const text = (body.text || '').trim();
+    
     if (!text) {
       return NextResponse.json(
         { error: 'Text cannot be empty' },
@@ -59,174 +63,112 @@ export async function POST(req: Request) {
       url.searchParams.get('stream') === '1' ||
       url.searchParams.get('stream') === 'true';
 
-    // Allow explicit override
-    if (body.force_action === 'save') {
-      const memory = await saveMemory({
-        text,
-        category: body.category || undefined,
-        source: body.source || undefined,
-      });
-      return NextResponse.json({
-        action: 'saved',
-        intent: 'save',
-        decider: 'override',
-        memory,
-      });
-    }
-    if (body.force_action === 'ask') {
-      if (wantStream) {
-        return streamAnswerWithRag({
-          text,
-          category: body.category || undefined,
-          needsCitation: false,
-        });
-      } else {
-        const { results, answer } = await answerWithRag({
-          text,
-          category: body.category || undefined,
-        });
-        return NextResponse.json({
-          action: 'answered',
-          intent: 'ask',
-          decider: 'override',
-          answer,
-          sources: results,
-        });
-      }
-    }
-
-    // Heurística previa: sesgar a conversación/consulta salvo pedido explícito de guardado
-    const pre = classifyIntentHeuristic(text);
-    if (pre === 'save') {
-      const memory = await saveMemory({
-        text,
-        category: body.category || 'chat_note',
-        source: body.source || 'web_chat',
-      });
-      return NextResponse.json({
-        action: 'saved',
-        intent: 'save',
-        decider: 'heuristic',
-        memory,
-      });
-    }
-    if (pre === 'ask') {
-      if (wantStream) {
-        return streamAnswerWithRag({
-          text,
-          category: body.category || 'chat_note',
-          needsCitation: false,
-        });
-      } else {
-        const { results, answer } = await answerWithRag({
-          text,
-          category: body.category || 'chat_note',
-        });
-        return NextResponse.json({
-          action: 'answered',
-          intent: 'ask',
-          decider: 'heuristic',
-          answer,
-          sources: results,
-        });
-      }
-    }
-
-    // Tool-calling (AI SDK) - decide only; we execute below
+    // Define tools for function calling
     const tools = {
       save_memory: {
         description:
-          'Guardar el texto del usuario como una nueva memoria persistente.',
-        // gpt-5 exige que "required" incluya todas las keys en properties.
-        // Hacemos ambas requeridas para cumplir con el validador del modelo.
+          'Use this function when the user wants to save information to their second brain. ' +
+          'This includes personal experiences, learnings, memories, notes, or any content they want to remember. ' +
+          'Examples: "Remember that...", "Save this note...", "I learned today that..."',
         parameters: z.object({
-          category: z.string(),
-          source: z.string(),
+          category: z.enum(CATEGORIES).describe('The category this memory belongs to. Must be one of the predefined categories.'),
+          source: z.enum(['chat', 'voice_note', 'conversation']).describe('The source of this memory. Must be one of the predefined sources.'),
         }),
       },
       answer_question: {
         description:
-          'Responder a la consulta del usuario usando RAG y devolver respuesta breve.',
-        // También requerimos needs_citation para cumplir con el validador.
+          'Use this function when the user is asking a question or requesting information from their second brain. ' +
+          'This retrieves relevant memories using RAG and constructs an answer based on stored context. ' +
+          'Examples: "What did I learn about...?", "Tell me about...", "Do I have notes on...?"',
         parameters: z.object({
-          needs_citation: z.boolean(),
+          needs_citation: z.boolean().describe('Whether to include source citations in the answer'),
         }),
       },
     } as const;
 
+    // Step 1: Use GPT function calling to determine intent
     const { toolCalls } = await generateText({
-      model: openai('gpt-5'),
-      // Only choose between tools; do not produce direct text
+      model: openai('gpt-4o-mini'),
       system: [
-        "Eres un enrutador de intención para un asistente RAG conversacional.",
-        "Elige exactamente una: 'save_memory' o 'answer_question'. No respondas directamente.",
-        "Criterios:",
-        "- Si el usuario hace una pregunta (¿?, interrogativos) → answer_question.",
-        "- Si pide explícitamente guardar/recordar/anotar → save_memory.",
-        "- En caso ambiguo, prioriza answer_question (interfaz conversacional).",
-        "Proporciona argumentos válidos para la herramienta elegida.",
-      ].join('\\n'),
+        'You are an intent router for SecondBrain, a personal knowledge management system.',
+        'Your job is to determine if the user wants to:',
+        '1. SAVE information to their memory (save_memory)',
+        '2. QUERY/ASK about information in their memory (answer_question)',
+        '',
+        'Decision criteria:',
+        '- Use save_memory when user explicitly wants to store/remember/save information',
+        '- Use answer_question when user asks questions or wants to retrieve information',
+        '- Default to answer_question for conversational queries',
+        '',
+        'You must choose exactly ONE tool. Provide appropriate arguments for the chosen tool.',
+      ].join('\n'),
       prompt: text,
       tools,
       toolChoice: 'required',
-      temperature: 0,
+      temperature: 0.4,
     });
 
-    // Get first tool call decision
+    // Step 2: Execute the chosen tool
     const call = toolCalls[0] as
-      | { toolName: 'save_memory'; args?: { category: string; source: string } }
-      | { toolName: 'answer_question'; args?: { needs_citation: boolean } }
+      | { toolName: 'save_memory'; args: { category: string; source: string } }
+      | { toolName: 'answer_question'; args: { needs_citation: boolean } }
       | undefined;
 
-    if (call?.toolName === 'save_memory') {
+    if (!call) {
+      return NextResponse.json(
+        { error: 'No tool was selected by the model' },
+        { status: 500 },
+      );
+    }
+
+    // Execute save_memory
+    if (call.toolName === 'save_memory') {
       const memory = await saveMemory({
         text,
-        category: call.args?.category ?? body.category ?? undefined,
-        source: call.args?.source ?? body.source ?? undefined,
+        category: call.args?.category || body.category || 'general',
+        source: call.args?.source || body.source || 'web_chat',
       });
+      
       return NextResponse.json({
         action: 'saved',
         intent: 'save',
-        decider: 'tool_calling',
+        message: '✓ Memoria guardada exitosamente',
         memory,
       });
     }
 
-    if (call?.toolName === 'answer_question') {
+    // Execute answer_question
+    if (call.toolName === 'answer_question') {
+      const needsCitation = call.args?.needs_citation ?? false;
+      
       if (wantStream) {
         return streamAnswerWithRag({
           text,
-          category: body.category ?? 'chat_note',
-          needsCitation: call.args?.needs_citation ?? false,
+          category: body.category || undefined,
+          needsCitation,
         });
       } else {
         const { results, answer } = await answerWithRag({
           text,
-          category: body.category ?? 'chat_note',
-          needsCitation: call.args?.needs_citation ?? false,
+          category: body.category || undefined,
+          needsCitation,
         });
+        
         return NextResponse.json({
           action: 'answered',
           intent: 'ask',
-          decider: 'tool_calling',
           answer,
           sources: results,
         });
       }
     }
 
-    // Fallback to save
-    const memory = await saveMemory({
-      text,
-      category: body.category || undefined,
-      source: body.source || undefined,
-    });
-    return NextResponse.json({
-      action: 'saved',
-      intent: 'save',
-      decider: 'fallback',
-      memory,
-    });
+    // Fallback (should not reach here)
+    return NextResponse.json(
+      { error: 'Unknown tool selected' },
+      { status: 500 },
+    );
+    
   } catch (err) {
     console.error('process route error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
@@ -234,56 +176,68 @@ export async function POST(req: Request) {
   }
 }
 
+/**
+ * Stream answer using RAG context
+ * Step 1: Retrieve relevant memories from RAG
+ * Step 2: Stream answer generation using retrieved context
+ */
 function streamAnswerWithRag(input: {
   text: string;
   category?: string;
   needsCitation?: boolean;
 }) {
   return (async () => {
-    // Retrieve first
+    // Step 1: Retrieve relevant memories from RAG
     const params = new URLSearchParams({
       query: input.text,
       limit: '5',
     });
     if (input.category) params.set('category', input.category);
+    
     const res = await fetch(`${RAG_API_URL}/search?${params.toString()}`, {
       method: 'GET',
       cache: 'no-store',
     });
+    
     if (!res.ok) {
       const t = await res.text();
       throw new Error(`RAG /search error: ${res.status} - ${t}`);
     }
+    
     const search = (await res.json()) as Array<{
       memory: { id: number; text: string; category?: string; source?: string };
       similarity_score: number;
     }>;
+    
+    // Take top 3 most relevant memories
     const top = search.slice(0, 3);
     const context = top
-      .map((r) => `- [id ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
+      .map((r) => `- [Memory ID ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
       .join('\n');
 
-    // Stream the answer
+    // Step 2: Stream the answer using retrieved context
     const result = await streamText({
-      model: openai('gpt-5'),
+      model: openai('gpt-4o-mini'),
       system: [
-        'Actúa como SecondBrain, el segundo cerebro digital del usuario.',
-        'Objetivo: responder usando EXCLUSIVAMENTE el contexto (RAG).',
-        'Reglas:',
-        '- Idioma: español neutro. Tono claro, profesional y cercano.',
-        '- Estilo: breve (2–4 frases), directo. Si hay pasos, usa viñetas.',
-        "- No inventes. Si el contexto es insuficiente, dilo y sugiere: \"¿Quieres que lo guarde como nota?\"",
-        '- Si aplica, menciona relaciones o conexiones detectadas en el contexto.',
-        '- Cuando corresponda, incluye una mención breve a la fuente entre paréntesis (ej: id o extracto).',
-        '- Respeta la privacidad: no uses datos externos ni asumas información.',
+        'You are SecondBrain, the user\'s digital second brain and personal knowledge assistant.',
+        'Your role: Answer questions using ONLY the provided context from their stored memories.',
+        '',
+        'Rules:',
+        '- Language: Neutral Spanish. Clear, professional yet friendly tone.',
+        '- Style: Brief (2-4 sentences), direct. Use bullet points for steps if needed.',
+        '- Never invent information. If context is insufficient, say so and suggest: "¿Quieres que lo guarde como nota?"',
+        '- When applicable, mention relationships or connections detected in the context.',
+        '- When appropriate, include brief source mentions in parentheses (e.g., memory ID or excerpt).',
+        '- Respect privacy: do not use external data or assume information not in context.',
       ].join('\n'),
       prompt:
-        `Pregunta:\n${input.text}\n\n` +
-        `Contexto:\n${context || 'No hay contexto disponible.'}\n\n` +
-        `${input.needsCitation ? 'Incluye una mención breve a la fuente.' : ''}`,
-      temperature: 0.2,
+        `User Question:\n${input.text}\n\n` +
+        `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
+        `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+      temperature: 0.6,
     });
-    // Enviar SOLO el texto en streaming (sin eventos), para que el cliente lo muestre limpio
+    
+    // Return text stream for clean client display
     return new Response(result.textStream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
@@ -293,6 +247,9 @@ function streamAnswerWithRag(input: {
   })();
 }
 
+/**
+ * Save memory to RAG system
+ */
 async function saveMemory(input: {
   text: string;
   category?: string;
@@ -308,61 +265,73 @@ async function saveMemory(input: {
     }),
     cache: 'no-store',
   });
+  
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`RAG /memories error: ${res.status} - ${t}`);
   }
+  
   return await res.json();
 }
 
+/**
+ * Answer question using RAG (non-streaming)
+ * Step 1: Retrieve relevant memories
+ * Step 2: Generate answer using context
+ */
 async function answerWithRag(input: {
   text: string;
   category?: string;
   needsCitation?: boolean;
 }) {
-  // 1) Retrieve
+  // Step 1: Retrieve relevant memories from RAG
   const params = new URLSearchParams({
     query: input.text,
     limit: '5',
   });
   if (input.category) params.set('category', input.category);
+  
   const res = await fetch(`${RAG_API_URL}/search?${params.toString()}`, {
     method: 'GET',
     cache: 'no-store',
   });
+  
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`RAG /search error: ${res.status} - ${t}`);
   }
+  
   const search = (await res.json()) as Array<{
     memory: { id: number; text: string; category?: string; source?: string };
     similarity_score: number;
   }>;
 
+  // Take top 3 most relevant memories
   const top = search.slice(0, 3);
   const context = top
-    .map((r) => `- [id ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
+    .map((r) => `- [Memory ID ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
     .join('\n');
 
-  // 2) Answer
+  // Step 2: Generate answer using retrieved context
   const { text } = await generateText({
-    model: openai('gpt-5'),
+    model: openai('gpt-4o-mini'),
     system: [
-      'Actúa como SecondBrain, el segundo cerebro digital del usuario.',
-      'Objetivo: responder usando EXCLUSIVAMENTE el contexto (RAG).',
-      'Reglas:',
-      '- Idioma: español neutro. Tono claro, profesional y cercano.',
-      '- Estilo: breve (2–4 frases), directo. Si hay pasos, usa viñetas.',
-      "- No inventes. Si el contexto es insuficiente, dilo y sugiere: \"¿Quieres que lo guarde como nota?\"",
-      '- Si aplica, menciona relaciones o conexiones detectadas en el contexto.',
-      '- Cuando corresponda, incluye una mención breve a la fuente entre paréntesis (ej: id o extracto).',
-      '- Respeta la privacidad: no uses datos externos ni asumas información.',
+      'You are SecondBrain, the user\'s digital second brain and personal knowledge assistant.',
+      'Your role: Answer questions using ONLY the provided context from their stored memories.',
+      '',
+      'Rules:',
+      '- Language: Neutral Spanish. Clear, professional yet friendly tone.',
+      '- Style: Brief (2-4 sentences), direct. Use bullet points for steps if needed.',
+      '- Never invent information. If context is insufficient, say so and suggest: "¿Quieres que lo guarde como nota?"',
+      '- When applicable, mention relationships or connections detected in the context.',
+      '- When appropriate, include brief source mentions in parentheses (e.g., memory ID or excerpt).',
+      '- Respect privacy: do not use external data or assume information not in context.',
     ].join('\n'),
     prompt:
-      `Pregunta:\n${input.text}\n\n` +
-      `Contexto:\n${context || 'No hay contexto disponible.'}\n\n` +
-      `${input.needsCitation ? 'Incluye una mención breve a la fuente.' : ''}`,
-    temperature: 0.2,
+      `User Question:\n${input.text}\n\n` +
+      `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
+      `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+    temperature: 0.6,
   });
 
   return {
