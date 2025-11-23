@@ -135,15 +135,8 @@ export async function POST(req: Request) {
     // Step 2: Execute the chosen tool
     const toolUse = (intentResponse.content as Array<unknown>).find(isToolUseBlock);
 
-    if (!toolUse) {
-      return NextResponse.json(
-        { error: 'No tool was selected by the model' },
-        { status: 500 },
-      );
-    }
-
     // Execute save_memory
-    if (toolUse.name === 'save_memory') {
+    if (!toolUse || toolUse.name === 'save_memory') {
       const memory = await saveMemory({
         text,
         category: body.category || null,
