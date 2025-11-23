@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Note } from '@/types/note';
-import { updateNote as updateNoteService, createNote as createNoteService } from '@/services/noteService';
+import { updateNote as updateNoteService } from '@/services/noteService';
 
 interface NoteStore {
   // Notes state
@@ -88,8 +88,6 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
   
   updateNote: async (id, updates) => {
-    const state = get();
-    
     try {
       // Call the service to update in RAG
       const updatedNote = await updateNoteService(id, updates);

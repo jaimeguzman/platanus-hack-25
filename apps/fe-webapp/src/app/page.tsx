@@ -26,7 +26,7 @@ export default function Home() {
 
   const handleNewNote = () => {
     const now = new Date().toISOString();
-    const pillar = selectedCategory === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedCategory;
+    const pillar: "career" | "social" | "hobby" = selectedCategory === 'all' ? 'career' : selectedCategory as "career" | "social" | "hobby";
     
     const newNote = {
       id: `note-${Date.now()}`,

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNoteStore } from '@/stores/noteStore';
-import { fetchNotes, searchNotes } from '@/services/noteService';
+import { searchNotes } from '@/services/noteService';
 import { getAllMemories, getMemoriesByCategory } from '@/services/ragService';
 import { NoteServiceError } from '@/lib/errors';
 import type { Note } from '@/types/note';
