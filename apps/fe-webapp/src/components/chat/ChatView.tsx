@@ -216,7 +216,7 @@ export function ChatView() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">SecondBrain Chat</h2>
+              <h2 className="text-lg font-semibold">Cognitive Context Chat</h2>
               <p className="text-xs text-muted-foreground">
                 Pregúntame sobre tu conocimiento almacenado
               </p>
@@ -242,7 +242,7 @@ export function ChatView() {
                 <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
                   <Brain className="w-16 h-16 text-muted-foreground mb-4" />
                   <h3 className="text-xl font-semibold mb-2">
-                    ¡Bienvenido a tu Segundo Cerebro!
+                    ¡Bienvenido a Cognitive Context!
                   </h3>
                   <p className="text-muted-foreground max-w-md">
                     Pregúntame cualquier cosa sobre tu conocimiento almacenado. 

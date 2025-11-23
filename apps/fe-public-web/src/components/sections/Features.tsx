@@ -62,7 +62,7 @@ export function Features() {
           </h2>
           
           <p className="text-lg text-[#999999] max-w-2xl mx-auto">
-            SecondBrain combina inteligencia artificial con diseño intuitivo para crear la experiencia
+            Cognitive Context combina inteligencia artificial con diseño intuitivo para crear la experiencia
             de gestión de conocimiento más poderosa y fácil de usar.
           </p>
         </div>

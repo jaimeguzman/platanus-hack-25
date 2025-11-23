@@ -187,7 +187,7 @@ export function AppSidebar() {
           <Brain className="h-5 w-5 shrink-0" />
           {state === 'expanded' && (
             <div className="flex flex-col min-w-0">
-              <h1 className="text-lg font-semibold truncate">Segundo Cerebro</h1>
+              <h1 className="text-lg font-semibold truncate">Cognitive Context</h1>
               <p className="text-xs text-muted-foreground truncate">PKM System</p>
             </div>
           )}

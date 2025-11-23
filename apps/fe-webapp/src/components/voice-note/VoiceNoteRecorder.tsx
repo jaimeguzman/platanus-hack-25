@@ -25,7 +25,7 @@ export function VoiceNoteRecorder({ onSave, onCancel }: VoiceNoteRecorderProps) 
 
   // Formatear duración en formato MM:SS
   const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / FORMATTING.DURATION_MINUTES_PER_HOUR);
+    const mins = Math.floor(seconds / FORMATTING.DURATION_SECONDS_PER_MINUTE);
     const secs = Math.floor(seconds % FORMATTING.DURATION_SECONDS_PER_MINUTE);
     return `${mins.toString().padStart(FORMATTING.DURATION_PAD_START, '0')}:${secs.toString().padStart(FORMATTING.DURATION_PAD_START, '0')}`;
   };
@@ -103,15 +103,22 @@ export function VoiceNoteRecorder({ onSave, onCancel }: VoiceNoteRecorderProps) 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-      if (mediaRecorderRef.current && isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
     };
-  }, [audioUrl, isRecording]);
+  }, []); // Sin dependencias - solo se ejecuta al desmontar
+
+  // Limpiar URL del audio cuando cambie
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
 
   return (
     <Card className="fixed inset-4 z-50 flex flex-col max-w-md mx-auto">

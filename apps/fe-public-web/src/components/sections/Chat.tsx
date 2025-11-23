@@ -64,17 +64,17 @@ export function Chat() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Prueba SecondBrain ahora
+            Prueba Cognitive Context ahora
           </h2>
           <p className="text-xl text-gray-600">
-            Envía mensajes de texto o audio y ve cómo SecondBrain te ayuda
+            Envía mensajes de texto o audio y ve cómo Cognitive Context te ayuda
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 max-w-2xl mx-auto">
           {/* Header */}
           <div className="bg-blue-600 text-white p-4 flex items-center justify-center">
-            <h3 className="text-lg font-semibold">SecondBrain</h3>
+            <h3 className="text-lg font-semibold">Cognitive Context</h3>
           </div>
 
           {/* Messages area */}

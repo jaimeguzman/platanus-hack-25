@@ -22,7 +22,7 @@ export function Hero() {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#2A2A2A] bg-[#1A1A1A]/50 backdrop-blur-sm z-20">
             <Brain size={16} className="text-blue-600 animate-pulse" />
             <span className="text-sm font-medium bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-              Tu segundo cerebro digital
+              Tu memoria, turbo-cargada.
             </span>
           </div>
 
@@ -32,7 +32,7 @@ export function Hero() {
               <span className="block">Gestiona tu</span>
               <span className="block">
                 <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 bg-clip-text text-transparent animate-gradient-x">
-                  Conocimiento Neural
+                  Conocimiento Inteligente
                 </span>
               </span>
               <span className="block text-[#999999]">Sin Esfuerzo</span>
@@ -41,7 +41,7 @@ export function Hero() {
             <p className="text-xl text-[#999999] max-w-2xl mx-auto leading-relaxed">
               <span className="inline-flex items-center gap-2">
                 <Sparkles size={20} className="text-blue-500 animate-pulse" />
-                SecondBrain captura, organiza y conecta automáticamente toda tu información.
+                Cognitive Context captura, organiza y conecta automáticamente toda tu información.
               </span>
               <br />
               <span className="text-[#B3B3B3]">

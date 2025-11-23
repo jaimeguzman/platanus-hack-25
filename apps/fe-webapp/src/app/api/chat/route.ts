@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
     });
 
     const systemPrompt = [
-      'You are SecondBrain, the user\'s digital second brain and personal knowledge assistant.',
+      'You are Cognitive Context, the user\'s digital second brain and personal knowledge assistant.',
       'Your role: Answer questions using the provided context from their stored memories and previous conversation.',
       '',
       'Rules:',
@@ -370,7 +370,7 @@ export async function POST(req: NextRequest) {
                     model: 'claude-3-5-haiku-20241022',
                     max_tokens: 2048,
                     system: [
-                      'Eres SecondBrain, el asistente de memoria del usuario.',
+                      'Eres Cognitive Context, el asistente de memoria del usuario.',
                       'Acabas de expandir nodos adyacentes en su grafo de conocimiento.',
                       'Tu tarea: Analizar cada grupo de recuerdos expandidos en detalle.',
                       '',

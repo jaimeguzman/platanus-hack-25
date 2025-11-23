@@ -135,7 +135,7 @@ export function HowItWorks() {
           
           <p className="text-lg text-[#999999] max-w-3xl mx-auto leading-relaxed">
             Cada pensamiento, nota e idea se convierte en una sinapsis digital. 
-            SecondBrain crea un universo de conocimiento interconectado que crece contigo.
+            Cognitive Context crea un universo de conocimiento interconectado que crece contigo.
           </p>
         </div>
 

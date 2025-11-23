@@ -35,10 +35,10 @@ export function Footer() {
           <div className="md:col-span-4">
             <div className="mb-6">
               <h3 className="text-2xl font-bold text-[#E5E5E5] mb-2">
-                SecondBrain
+                Cognitive Context
               </h3>
               <p className="text-[#999999] text-sm leading-relaxed">
-                Tu segundo cerebro digital. Gestiona tu conocimiento con inteligencia artificial.
+                Tu memoria, turbo-cargada. Gestiona tu conocimiento con inteligencia artificial.
               </p>
             </div>
             
@@ -172,7 +172,7 @@ export function Footer() {
             
             {/* Copyright */}
             <div className="text-sm text-[#666666]">
-              © {currentYear} SecondBrain. Todos los derechos reservados.
+              © {currentYear} Cognitive Context. Todos los derechos reservados.
             </div>
           </div>
           

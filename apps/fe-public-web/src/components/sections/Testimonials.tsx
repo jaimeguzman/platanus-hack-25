@@ -7,7 +7,7 @@ const testimonials = [
     name: 'María García',
     role: 'Desarrolladora Senior',
     content:
-      'SecondBrain cambió cómo trabajo. Ya no pierdo tiempo buscando información que capturé hace meses. Mis ideas están siempre a mano.',
+      'Cognitive Context cambió cómo trabajo. Ya no pierdo tiempo buscando información que capturé hace meses. Mis ideas están siempre a mano.',
     rating: 5,
   },
   {
@@ -28,7 +28,7 @@ const testimonials = [
     name: 'Carlos Ruiz',
     role: 'Emprendedor',
     content:
-      'Como fundador, necesito recordar cientos de decisiones y contextos. SecondBrain me ayuda a mantener todo coherente y accesible.',
+        'Como fundador, necesito recordar cientos de decisiones y contextos. Cognitive Context me ayuda a mantener todo coherente y accesible.',
     rating: 5,
   },
 ];
@@ -41,7 +41,7 @@ export function Testimonials() {
         <div className="text-center space-y-4 mb-16">
           <h2 className="heading-h2">Lo que dicen nuestros usuarios</h2>
           <p className="text-lg text-[#999999] max-w-2xl mx-auto">
-            Descubre cómo SecondBrain ha transformado la forma de trabajar de miles de personas
+            Descubre cómo Cognitive Context ha transformado la forma de trabajar de miles de personas
           </p>
         </div>
 

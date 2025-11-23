@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SecondBrain - Tu Segundo Cerebro para Gestionar Conocimiento',
+  title: 'Cognitive Context - Tu Segundo Cerebro para Gestionar Conocimiento',
   description: 'Sistema de gestión de conocimiento personal que captura y organiza automáticamente tu contexto de trabajo.',
 };
 

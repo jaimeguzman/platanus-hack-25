@@ -24,7 +24,7 @@ export function Header() {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">SB</span>
             </div>
-            <span className="font-bold text-lg">SecondBrain</span>
+            <span className="font-bold text-lg">Cognitive Context</span>
           </div>
 
           {/* Desktop Navigation */}
