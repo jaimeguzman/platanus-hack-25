@@ -6,6 +6,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, delete
 from sqlalchemy.exc import SQLAlchemyError
+from anthropic import Anthropic
 
 from database import SessionLocal, Base, engine
 from models import Memory, MemoryChunk, MemoryEdge
@@ -37,6 +38,7 @@ class RagMemoryService:
         load_graph: bool = True,
         chunk_size_words: Optional[int] = None,
         chunk_overlap_words: Optional[int] = None,
+        enable_query_enhancement: bool = True,
     ):
         """
         Initialize the RAG memory service.
@@ -48,17 +50,27 @@ class RagMemoryService:
             load_graph: Whether to load the graph from database on initialization
             chunk_size_words: Number of words per chunk (defaults to config value)
             chunk_overlap_words: Number of overlapping words (defaults to config value)
+            enable_query_enhancement: Whether to enable AI-powered query enhancement
         """
         self.embedding_generator = EmbeddingGenerator()
         self.graph_store = MemoryGraphStore()
         self.similarity_threshold = similarity_threshold
         self.max_similar_connections = max_similar_connections
+        self.enable_query_enhancement = enable_query_enhancement
         
         # Initialize text chunker
         self.chunker = TextChunker(
             chunk_size_words=chunk_size_words or config.chunk_size_words,
             overlap_words=chunk_overlap_words or config.chunk_overlap_words,
         )
+        
+        # Initialize Anthropic client for query enhancement
+        if self.enable_query_enhancement and config.anthropic_api_key:
+            self.anthropic_client = Anthropic(api_key=config.anthropic_api_key)
+        else:
+            self.anthropic_client = None
+            if self.enable_query_enhancement:
+                logger.warning("Query enhancement enabled but no Anthropic API key found")
 
         if auto_create_schema:
             try:
@@ -445,6 +457,9 @@ class RagMemoryService:
             for memory in memories:
                 _ = memory.id
                 _ = memory.text
+                _ = memory.created_at
+                _ = memory.category
+                _ = memory.source
                 session.expunge(memory)
             
             return memories
@@ -674,6 +689,9 @@ class RagMemoryService:
             # Expunge before returning
             _ = memory.id
             _ = memory.text
+            _ = memory.created_at
+            _ = memory.category
+            _ = memory.source
             session.expunge(memory)
             
             return memory
@@ -720,6 +738,9 @@ class RagMemoryService:
             for memory in memories:
                 _ = memory.id
                 _ = memory.text
+                _ = memory.created_at
+                _ = memory.category
+                _ = memory.source
                 session.expunge(memory)
             
             return memories
@@ -865,12 +886,76 @@ class RagMemoryService:
 
         return results
 
+    def _enhance_query(self, query_text: str, context: Optional[List[str]] = None) -> str:
+        """
+        Enhance user query for better vector search results using AI.
+        
+        Args:
+            query_text: Original user query
+            context: Optional list of recent queries/context for better enhancement
+            
+        Returns:
+            Enhanced query text, or original if enhancement fails/disabled
+        """
+        if not self.enable_query_enhancement or not self.anthropic_client:
+            return query_text
+            
+            
+        try:
+            # Build context from recent queries if provided
+            context_str = ""
+            if context:
+                context_str = f"\nContexto de consultas recientes:\n" + "\n".join(context[-3:])
+            
+            enhancement_prompt = '\n'.join([
+                'Tu tarea: Mejorar una consulta de búsqueda para un sistema de memoria personal.',
+                'Objetivo: Transformar la consulta del usuario en términos más efectivos para búsqueda vectorial.',
+                '',
+                'Reglas:',
+                '- Mantén el significado original intacto',
+                '- Agrega contexto semántico útil',
+                '- NO inventes información que no esté implícita',
+                '- Máximo 2-3 líneas de salida',
+                '- Enfócate en conceptos, no en palabras exactas',
+                '- Incluye variaciones en español e inglés si es relevante',
+                '',
+                'Ejemplos:',
+                'Usuario: "reunión cliente" → "reunión cliente meeting junta negociación propuesta comercial"',
+                'Usuario: "aprendí marketing" → "aprendizaje marketing conocimientos insights estrategias promoción digital"',
+                'Usuario: "proyecto python" → "proyecto python desarrollo programación código script aplicación"',
+                'Usuario: "ideas startup" → "ideas startup emprendimiento negocio innovación empresa"',
+                '',
+                context_str,
+                'Consulta a mejorar:'
+            ])
+
+            response = self.anthropic_client.messages.create(
+                model=config.category_detection_model,
+                max_tokens=150,
+                temperature=0.3,
+                messages=[{
+                    'role': 'user',
+                    'content': f"{enhancement_prompt}\n\n\"{query_text}\""
+                }]
+            )
+
+            enhanced_query = response.content[0].text.strip() if response.content else query_text
+            
+            logger.info(f"Query enhancement: '{query_text}' → '{enhanced_query}'")
+            return enhanced_query
+
+        except Exception as e:
+            logger.warning(f"Query enhancement failed: {e}")
+            return query_text  # Fallback to original
+
     def search_similar_by_text(
         self,
         query_text: str,
         limit: int = 5,
         category: Optional[str] = None,
         min_similarity: Optional[float] = None,
+        enhance_query: bool = True,
+        query_context: Optional[List[str]] = None,
     ) -> List[Tuple[Memory, float]]:
         """
         Search for memories similar to the query text.
@@ -881,6 +966,8 @@ class RagMemoryService:
             limit: Maximum number of results
             category: Filter by category
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
+            enhance_query: Whether to use AI-powered query enhancement (default: True)
+            query_context: Optional list of recent queries for better enhancement
             
         Returns:
             List of (Memory, similarity_score) tuples, sorted by similarity descending
@@ -890,6 +977,11 @@ class RagMemoryService:
         
         query_text = query_text.strip()
         
+        # Enhance query if enabled
+        if enhance_query:
+            query_text = self._enhance_query(query_text, query_context)
+        
+        logger.info(f"Query text: {query_text}")
         # Split query into chunks
         query_chunks = self.chunker.split_text(query_text)
         if not query_chunks:
@@ -1064,6 +1156,9 @@ class RagMemoryService:
                 if memory:
                     _ = memory.id
                     _ = memory.text
+                    _ = memory.created_at
+                    _ = memory.category
+                    _ = memory.source
                     session.expunge(memory)
                     memories.append(memory)
             
@@ -1135,7 +1230,7 @@ class RagMemoryService:
         """
         session = self._get_session()
         try:
-            stmt = select(Memory.id, Memory.text, Memory.category).order_by(Memory.id)
+            stmt = select(Memory.id, Memory.text, Memory.category, Memory.created_at).order_by(Memory.id)
             
             if category:
                 stmt = stmt.where(Memory.category == category)
@@ -1150,6 +1245,7 @@ class RagMemoryService:
                     "id": row.id,
                     "label": (row.text[:80] + "...") if len(row.text) > 80 else row.text,
                     "category": row.category,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
                 }
                 for row in rows
             ]

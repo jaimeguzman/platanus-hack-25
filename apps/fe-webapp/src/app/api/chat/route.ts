@@ -25,6 +25,7 @@ interface MemoryDetail {
   text: string;
   category?: string;
   source?: string;
+  created_at: string;
 }
 
 interface ExpandedNode {
@@ -66,15 +67,22 @@ export async function POST(req: NextRequest) {
 
     let context = 'No context available.';
     let topResults: Array<{
-      memory: { id: number; text: string; category?: string; source?: string };
+      memory: { id: number; text: string; category?: string; source?: string; created_at: string };
       similarity_score: number;
     }> = [];
 
     // Step 1: Retrieve relevant memories from RAG (skip if expand-only)
     if (!isExpandOnly) {
+      // Build query context from recent conversation for enhancement
+      const queryContext = history
+        .slice(-3) // Last 3 messages for context
+        .map(msg => `${msg.role}: ${msg.content}`);
+      
       const params = new URLSearchParams({
         query: message,
         limit: '5',
+        enhance_query: 'true',
+        query_context: queryContext.length > 0 ? JSON.stringify(queryContext) : '',
       });
 
       const ragResponse = await fetch(`${RAG_API_URL}/search?${params.toString()}`, {
@@ -90,14 +98,21 @@ export async function POST(req: NextRequest) {
     
       if (ragResponse.ok) {
         const searchResults = (await ragResponse.json()) as Array<{
-          memory: { id: number; text: string; category?: string; source?: string };
+          memory: { id: number; text: string; category?: string; source?: string; created_at: string };
           similarity_score: number;
         }>;
 
         // Take top 3 most relevant memories
         topResults = searchResults.slice(0, 3);
         context = topResults
-          .map((r) => `- [Memory ID ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
+          .map((r) => {
+            const createdDate = new Date(r.memory.created_at).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            return `- [Memory ID ${r.memory.id}, creada el ${createdDate}] ${r.memory.text.slice(0, 600)}`;
+          })
           .join('\n');
       }
     } else {
@@ -165,9 +180,9 @@ export async function POST(req: NextRequest) {
       'Rules:',
       '- Language: Neutral Spanish. Clear, professional yet friendly tone.',
       '- Style: Brief (2-5 sentences), direct. Use bullet points for steps if needed.',
-      '- Never invent information. If context is insufficient, say so and suggest: "¿Quieres que lo guarde como nota?"',
+      '- Never invent information. If context is insufficient, say ask to get more information',
       '- When applicable, mention relationships or connections detected in the context.',
-      '- When appropriate, include brief source mentions in parentheses (e.g., memory ID or excerpt).',
+      '- IMPORTANT: When relevant, mention creation dates to provide temporal context (e.g., "según una nota de marzo de 2024").',
       '- Respect privacy: do not use external data or assume information not in context.',
       '- Maintain conversation continuity: reference previous messages when relevant.',
       '- If asked about previous messages, use the conversation history to answer.',
@@ -186,7 +201,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 2048,
       system: systemPrompt.join('\n'),
       messages: conversationMessages,
-      temperature: 0.6,
+      temperature: 0.8,
     };
 
     if (tools.length > 0) {
@@ -324,16 +339,28 @@ export async function POST(req: NextRequest) {
                   let analysisContext = 'Grupos de recuerdos expandidos:\n\n';
                   
                   expandedNodesWithDetails.forEach((group, index) => {
+                    const parentCreatedDate = new Date(group.parentMemory.created_at).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    });
                     analysisContext += `Grupo ${index + 1} - Nodo Central [ID ${group.parentId}]:\n`;
                     analysisContext += `"${group.parentMemory.text}"\n`;
-                    analysisContext += `Categoría: ${group.parentMemory.category || 'sin categoría'}\n\n`;
+                    analysisContext += `Categoría: ${group.parentMemory.category || 'sin categoría'}\n`;
+                    analysisContext += `Creado el: ${parentCreatedDate}\n\n`;
                     analysisContext += `Recuerdos conectados:\n`;
                     
                     group.neighbors.forEach((neighbor, nIdx) => {
+                      const neighborCreatedDate = new Date(neighbor.created_at).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      });
                       analysisContext += `  ${nIdx + 1}. [ID ${neighbor.id}] ${neighbor.text}\n`;
                       if (neighbor.category) {
                         analysisContext += `     Categoría: ${neighbor.category}\n`;
                       }
+                      analysisContext += `     Creado el: ${neighborCreatedDate}\n`;
                     });
                     analysisContext += '\n';
                   });
@@ -352,11 +379,13 @@ export async function POST(req: NextRequest) {
                       '- Analiza cómo se conectan los recuerdos adyacentes',
                       '- Encuentra patrones, relaciones o insights',
                       '- Menciona categorías relevantes',
+                      '- IMPORTANTE: Considera las fechas de creación para identificar evolución temporal del conocimiento',
                       '',
                       'Formato:',
                       '- Usa encabezados con emoji para cada grupo (📊, 🔗, 💡, etc.)',
                       '- Sé extensivo pero conciso (3-5 oraciones por grupo)',
                       '- Resalta conexiones interesantes entre conceptos',
+                      '- Menciona fechas cuando sea relevante para mostrar evolución temporal',
                       '- Termina con un resumen general de lo que se descubrió',
                       '',
                       'Tono: Profesional, analítico, pero accesible. En español neutral.',

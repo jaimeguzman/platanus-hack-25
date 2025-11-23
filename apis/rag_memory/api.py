@@ -154,7 +154,7 @@ def _decide_intent_via_tool_call(text: str) -> str:
             {"role": "user", "content": text},
         ]
         resp = client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-4o-mini",
             messages=messages,
             tools=tools,
             tool_choice="required",
@@ -400,14 +400,27 @@ async def search_memories(
     limit: int = Query(5, description="Maximum number of results"),
     category: Optional[str] = Query(None, description="Filter by category"),
     min_similarity: Optional[float] = Query(None, description="Minimum similarity threshold (0.0 to 1.0)"),
+    enhance_query: bool = Query(True, description="Whether to use AI-powered query enhancement"),
+    query_context: Optional[str] = Query(None, description="JSON string with recent conversation context for better enhancement"),
 ):
     """Search for memories similar to the query text."""
     try:
+        # Parse query context if provided
+        context_list = None
+        if query_context:
+            try:
+                import json
+                context_list = json.loads(query_context)
+            except json.JSONDecodeError:
+                logger.warning(f"Invalid query_context JSON: {query_context}")
+        
         results = rag_service.search_similar_by_text(
             query_text=query,
             limit=limit,
             category=category,
             min_similarity=min_similarity,
+            enhance_query=enhance_query,
+            query_context=context_list,
         )
         return [
             SearchResult(
@@ -574,6 +587,7 @@ async def process_input(request: ProcessRequest):
                 query_text=text,
                 limit=5,
                 category=request.category,
+                enhance_query=True,  # Enable query enhancement by default
             )
             answer = _generate_answer_with_context(
                 query=text,
