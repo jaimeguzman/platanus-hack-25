@@ -187,10 +187,10 @@ export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedA
     const now = new Date().toISOString();
     
     // Save ONLY to RAG (no Supabase)
+    // Category will be auto-detected by the RAG service
     const noteText = `${note.title}\n\n${note.content}`;
     const ragResponse = await saveNoteToRag(
       noteText,
-      pillar,
       'text_new_note'
     );
     
@@ -247,12 +247,11 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<No
       }
       
       const noteText = `${updates.title}\n\n${updates.content}`;
-      const pillar = updates.pillar;
       
+      // Category will be auto-detected by the RAG service on update
       const ragResponse = await updateNoteInRag(
         memoryId,
         noteText,
-        pillar,
         'text_new_note'
       );
       

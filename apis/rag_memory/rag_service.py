@@ -130,8 +130,8 @@ class RagMemoryService:
         
         text = text.strip()
         
-        # Auto-detect category if not provided and auto_categorize is enabled
-        if auto_categorize and not category:
+        # Auto-detect category if auto_categorize is enabled
+        if auto_categorize:
             try:
                 detected_category = detect_category(text)
                 if detected_category:

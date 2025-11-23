@@ -59,14 +59,14 @@ export default function Home() {
         duration: Infinity, // Keep toast visible until we dismiss it
       });
 
-      // Get pillar for the note
+      // Get pillar for the note (not used for categorization, just for display)
       const pillar = selectedPillar === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedPillar;
       
       // Call transcription API
+      // Category will be auto-detected by the RAG service
       const transcriptionResult = await transcribeAudioDirect(
         audioBlob,
         `voice-note-${Date.now()}.webm`,
-        pillar,
         'voice-recorder'
       );
 

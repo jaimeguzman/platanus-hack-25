@@ -54,10 +54,10 @@ const RAG_API_BASE_URL = process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhos
 
 /**
  * Save a note to RAG memory
+ * Category will be auto-detected by the RAG service
  */
 export async function saveNoteToRag(
   text: string,
-  category?: string,
   source?: string
 ): Promise<SaveToRagResponse> {
   try {
@@ -68,8 +68,8 @@ export async function saveNoteToRag(
       },
       body: JSON.stringify({
         text,
-        category,
         source: source || 'text_new_note',
+        auto_categorize: true, // Enable auto-categorization in RAG service
       }),
     });
 
@@ -106,11 +106,11 @@ export async function saveNoteToRag(
 
 /**
  * Update a note in RAG memory
+ * Category will be auto-detected by the RAG service
  */
 export async function updateNoteInRag(
   memoryId: number,
   text: string,
-  category?: string,
   source?: string
 ): Promise<SaveToRagResponse> {
   try {
@@ -121,8 +121,8 @@ export async function updateNoteInRag(
       },
       body: JSON.stringify({
         text,
-        category,
         source: source || 'text_new_note',
+        // Note: auto_categorize is not used in updates since category would already be set
       }),
     });
 

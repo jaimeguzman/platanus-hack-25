@@ -283,7 +283,7 @@ async def create_memory(memory_data: MemoryCreate):
             text=memory_data.text,
             category=memory_data.category,
             source=memory_data.source,
-            auto_categorize=memory_data.auto_categorize,
+            auto_categorize=True
         )
         
         # Build graph node data for the newly created memory
