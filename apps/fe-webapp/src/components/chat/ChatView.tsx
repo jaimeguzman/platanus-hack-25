@@ -7,13 +7,20 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { MiniGraph } from '@/components/chat/MiniGraph';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Brain, Trash2 } from 'lucide-react';
+import { Brain, Trash2, Sparkles } from 'lucide-react';
+
+interface NodeFamily {
+  parentId: number;
+  neighborIds: number[];
+}
 
 export function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [highlightedMemoryIds, setHighlightedMemoryIds] = useState<number[]>([]);
+  const [nodeFamilies, setNodeFamilies] = useState<NodeFamily[]>([]);
+  const [originalSearchNodes, setOriginalSearchNodes] = useState<number[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,16 +58,22 @@ export function ChatView() {
     if (confirm('¿Estás seguro de que quieres limpiar el historial del chat?')) {
       setMessages([]);
       setStreamingMessage('');
+      setHighlightedMemoryIds([]);
+      setNodeFamilies([]);
+      setOriginalSearchNodes([]);
       localStorage.removeItem('chat-history');
     }
   };
 
   const handleSendMessage = async (content: string) => {
+    // Check if this is an expand-only request
+    const isExpandOnly = content.startsWith('[EXPAND_ONLY]');
+    
     // Add user message
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content,
+      content: isExpandOnly ? 'Explorar ideas relacionadas' : content,
       timestamp: new Date(),
     };
     
@@ -84,6 +97,7 @@ export function ChatView() {
         body: JSON.stringify({ 
           message: content,
           history,
+          activeMemoryIds: highlightedMemoryIds,
         }),
       });
 
@@ -99,7 +113,8 @@ export function ChatView() {
       }
 
       let accumulatedText = '';
-      let memoryIds: number[] = [];
+      let memoryIds: number[] = isExpandOnly ? highlightedMemoryIds : [];
+      let newFamilies: NodeFamily[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -117,13 +132,31 @@ export function ChatView() {
             
             if (parsed.type === 'metadata' && parsed.memoryIds) {
               // Received memory IDs, highlight them in the graph
-              memoryIds = parsed.memoryIds;
-              console.log('Received memory IDs from API:', memoryIds);
-              setHighlightedMemoryIds(memoryIds);
+              // Only update if not expand-only
+              if (!isExpandOnly) {
+                memoryIds = parsed.memoryIds;
+                console.log('Received memory IDs from API:', memoryIds);
+                setHighlightedMemoryIds(memoryIds);
+                // These are the original search nodes - store them for color assignment
+                setOriginalSearchNodes(memoryIds);
+              }
             } else if (parsed.type === 'text' && parsed.content) {
               // Received text chunk
               accumulatedText += parsed.content;
               setStreamingMessage(accumulatedText);
+            } else if (parsed.type === 'expand' && parsed.expandedNodes) {
+              // Received expanded nodes from function calling
+              console.log('Received expanded nodes:', parsed.expandedNodes);
+              newFamilies = parsed.expandedNodes.map((node: { parentId: number; neighbors: number[] }) => ({
+                parentId: node.parentId,
+                neighborIds: node.neighbors,
+              }));
+              
+              // Add all new neighbor IDs to highlighted nodes
+              const allNeighborIds = newFamilies.flatMap(f => f.neighborIds);
+              const combinedIds = [...memoryIds, ...allNeighborIds];
+              setHighlightedMemoryIds(combinedIds);
+              setNodeFamilies(newFamilies);
             }
           } catch {
             // If it's not JSON, treat it as plain text (backward compatibility)
@@ -161,11 +194,19 @@ export function ChatView() {
       setStreamingMessage('');
       setIsStreaming(false);
       setHighlightedMemoryIds([]);
+      setNodeFamilies([]);
+      setOriginalSearchNodes([]);
     }
   };
 
+  const handleExploreAdjacent = () => {
+    // Create a special message that triggers expansion without RAG search
+    const message = '[EXPAND_ONLY] Explorar nodos adyacentes';
+    handleSendMessage(message);
+  };
+
   return (
-    <div className="flex max-h-[calc(100vh-64px)]">
+    <div className="flex max-h-[calc(100vh-64px)] h-full">
       {/* Main Chat Area */}
       <div className="flex flex-col flex-1">
         {/* Chat Header */}
@@ -233,15 +274,30 @@ export function ChatView() {
         </div>
 
         {/* Input Area */}
-        <ChatInput
-          onSend={handleSendMessage}
-          disabled={isStreaming}
-          placeholder={
-            isStreaming
-              ? 'Esperando respuesta...'
-              : 'Escribe tu pregunta...'
-          }
-        />
+        <div className="border-t bg-background">
+          {highlightedMemoryIds.length > 0 && !isStreaming && (
+            <div className="px-4 pt-3 pb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExploreAdjacent}
+                className="w-full justify-start gap-2 text-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                Explorar ideas relacionadas ({highlightedMemoryIds.length} nodos activos)
+              </Button>
+            </div>
+          )}
+          <ChatInput
+            onSend={handleSendMessage}
+            disabled={isStreaming}
+            placeholder={
+              isStreaming
+                ? 'Esperando respuesta...'
+                : 'Escribe tu pregunta...'
+            }
+          />
+        </div>
       </div>
 
       {/* Mini Graph Sidebar */}
@@ -254,6 +310,8 @@ export function ChatView() {
         </div>
         <MiniGraph 
           highlightedNodeIds={highlightedMemoryIds}
+          nodeFamilies={nodeFamilies}
+          originalSearchNodes={originalSearchNodes}
           className="flex-1"
         />
       </div>

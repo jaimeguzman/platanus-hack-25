@@ -5,12 +5,36 @@ import * as d3 from 'd3';
 import { useTheme } from 'next-themes';
 import type { D3Node, D3Edge } from '@/types/graph';
 
+interface NodeFamily {
+  parentId: number;
+  neighborIds: number[];
+}
+
 interface MiniGraphProps {
   highlightedNodeIds?: number[];
+  nodeFamilies?: NodeFamily[];
+  originalSearchNodes?: number[];
   className?: string;
 }
 
-export function MiniGraph({ highlightedNodeIds = [], className = '' }: MiniGraphProps) {
+// Color palette (defined outside component to be stable)
+const COLOR_PALETTE = [
+  { fill: '#10b981', stroke: '#34d399' }, // Green
+  { fill: '#3b82f6', stroke: '#60a5fa' }, // Blue
+  { fill: '#f59e0b', stroke: '#fbbf24' }, // Amber
+  { fill: '#ef4444', stroke: '#f87171' }, // Red
+  { fill: '#8b5cf6', stroke: '#a78bfa' }, // Purple
+  { fill: '#ec4899', stroke: '#f472b6' }, // Pink
+  { fill: '#14b8a6', stroke: '#2dd4bf' }, // Teal
+  { fill: '#f97316', stroke: '#fb923c' }, // Orange
+];
+
+export function MiniGraph({ 
+  highlightedNodeIds = [], 
+  nodeFamilies = [],
+  originalSearchNodes = [],
+  className = '' 
+}: MiniGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -21,6 +45,9 @@ export function MiniGraph({ highlightedNodeIds = [], className = '' }: MiniGraph
   const simulationRef = useRef<d3.Simulation<D3Node, D3Edge> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const svgSelectionRef = useRef<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
+  
+  // Persistent color mapping to keep colors stable across expansions
+  const nodeColorMapRef = useRef<Map<string, { fill: string; stroke: string; colorIndex: number }>>(new Map());
 
   useEffect(() => {
     setMounted(true);
@@ -116,6 +143,7 @@ export function MiniGraph({ highlightedNodeIds = [], className = '' }: MiniGraph
       .selectAll('line')
       .data(graphData.edges)
       .join('line')
+      .attr('class', d => `edge-${d.source}-${d.target}`)
       .attr('stroke', isDarkMode ? '#444' : '#ddd')
       .attr('stroke-width', 1)
       .attr('stroke-opacity', 0.4);
@@ -161,30 +189,101 @@ export function MiniGraph({ highlightedNodeIds = [], className = '' }: MiniGraph
     };
   }, [graphData, isDarkMode]);
 
-  // Highlight nodes when highlightedNodeIds changes
+  // Highlight nodes when highlightedNodeIds or nodeFamilies changes
   useEffect(() => {
     if (!svgRef.current || graphData.nodes.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     const highlightedIds = new Set(highlightedNodeIds.map(id => String(id)));
     
-    console.log('Highlighting nodes:', highlightedNodeIds, 'as strings:', Array.from(highlightedIds));
-
-    // Color palette for highlighted nodes
-    const colorPalette = [
-      { fill: '#10b981', stroke: '#34d399' }, // Green
-      { fill: '#3b82f6', stroke: '#60a5fa' }, // Blue
-      { fill: '#f59e0b', stroke: '#fbbf24' }, // Amber
-      { fill: '#ef4444', stroke: '#f87171' }, // Red
-      { fill: '#8b5cf6', stroke: '#a78bfa' }, // Purple
-      { fill: '#ec4899', stroke: '#f472b6' }, // Pink
-      { fill: '#14b8a6', stroke: '#2dd4bf' }, // Teal
-      { fill: '#f97316', stroke: '#fb923c' }, // Orange
-    ];
+    console.log('Highlighting nodes:', highlightedNodeIds);
+    console.log('Original search nodes:', originalSearchNodes);
+    console.log('Node families:', nodeFamilies);
 
     // Get current theme colors
     const defaultFill = isDarkMode ? '#888' : '#666';
     const defaultStroke = isDarkMode ? '#333' : '#fff';
+    const defaultEdgeColor = isDarkMode ? '#444' : '#ddd';
+
+    // If no nodes are highlighted, clear the color map and reset all nodes
+    if (highlightedIds.size === 0) {
+      nodeColorMapRef.current.clear();
+      
+      svg.selectAll('circle')
+        .transition()
+        .duration(300)
+        .attr('fill', defaultFill)
+        .attr('r', 4)
+        .attr('stroke', defaultStroke)
+        .attr('stroke-width', 1);
+
+      svg.selectAll('line')
+        .transition()
+        .duration(300)
+        .attr('stroke', defaultEdgeColor)
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.4);
+      
+      return;
+    }
+
+    // Get existing color map
+    const nodeColorMap = nodeColorMapRef.current;
+    
+    // Step 1: Assign colors to original search nodes (these are the "root" nodes)
+    // Each original search node gets a unique color
+    originalSearchNodes.forEach((nodeId, index) => {
+      const idStr = String(nodeId);
+      if (!nodeColorMap.has(idStr)) {
+        const colors = COLOR_PALETTE[index % COLOR_PALETTE.length];
+        nodeColorMap.set(idStr, { ...colors, colorIndex: index % COLOR_PALETTE.length });
+        console.log(`Assigning color ${index} to original node ${nodeId}`);
+      }
+    });
+    
+    // Step 2: For each family, assign the parent's color to all neighbors
+    // This creates "color chains" where descendants inherit the parent's color
+    nodeFamilies.forEach((family) => {
+      const parentIdStr = String(family.parentId);
+      let parentColor = nodeColorMap.get(parentIdStr);
+      
+      // If parent doesn't have a color yet, it might be a descendant itself
+      // Try to find its color by looking at which family it belongs to
+      if (!parentColor) {
+        // Check if this parent is a neighbor in another family
+        const parentFamily = nodeFamilies.find(f => 
+          f.neighborIds.includes(family.parentId)
+        );
+        
+        if (parentFamily) {
+          // Inherit the grandparent's color
+          const grandparentIdStr = String(parentFamily.parentId);
+          const grandparentColor = nodeColorMap.get(grandparentIdStr);
+          if (grandparentColor) {
+            parentColor = grandparentColor;
+            nodeColorMap.set(parentIdStr, { ...grandparentColor });
+            console.log(`Node ${family.parentId} inherits color from grandparent ${parentFamily.parentId}`);
+          }
+        }
+        
+        // If still no color, assign a new one (shouldn't happen in normal flow)
+        if (!parentColor) {
+          const nextIndex = nodeColorMap.size % COLOR_PALETTE.length;
+          parentColor = { ...COLOR_PALETTE[nextIndex], colorIndex: nextIndex };
+          nodeColorMap.set(parentIdStr, parentColor);
+          console.log(`Assigning new color ${nextIndex} to orphan parent ${family.parentId}`);
+        }
+      }
+      
+      // Neighbors get EXACTLY the same color as their parent
+      family.neighborIds.forEach(neighborId => {
+        const neighborIdStr = String(neighborId);
+        if (!nodeColorMap.has(neighborIdStr)) {
+          nodeColorMap.set(neighborIdStr, { ...parentColor });
+          console.log(`Node ${neighborId} inherits color from parent ${family.parentId}`);
+        }
+      });
+    });
 
     // Reset all nodes to default state first
     svg.selectAll('circle')
@@ -195,24 +294,62 @@ export function MiniGraph({ highlightedNodeIds = [], className = '' }: MiniGraph
       .attr('stroke', defaultStroke)
       .attr('stroke-width', 1);
 
-    // Then highlight the specific nodes by their IDs with different colors
-    if (highlightedIds.size > 0) {
-      Array.from(highlightedIds).forEach((nodeId, index) => {
-        const node = svg.select(`.node-${nodeId}`);
-        const colors = colorPalette[index % colorPalette.length];
-        console.log(`Selecting .node-${nodeId}:`, node.size(), 'elements found');
-        node
-          .transition()
-          .duration(300)
-          .attr('fill', colors.fill)
-          .attr('r', 6)
-          .attr('stroke', colors.stroke)
-          .attr('stroke-width', 2);
-      });
-    }
+    // Reset all edges to default state
+    svg.selectAll('line')
+      .transition()
+      .duration(300)
+      .attr('stroke', defaultEdgeColor)
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.4);
 
-    console.log(`Highlighted ${highlightedIds.size} nodes`);
-  }, [highlightedNodeIds, graphData.nodes.length, isDarkMode]);
+    // Apply colors to all mapped nodes
+    nodeColorMap.forEach((colorData, nodeId) => {
+      const node = svg.select(`.node-${nodeId}`);
+      
+      // Check if this is a parent node (make it larger)
+      const isParent = nodeFamilies.some(f => String(f.parentId) === nodeId);
+      // Check if this is an original search node (make it even larger)
+      const isOriginal = originalSearchNodes.includes(Number(nodeId));
+      
+      const radius = isOriginal ? 8 : (isParent ? 6 : 5);
+      const strokeWidth = isOriginal ? 3 : (isParent ? 2.5 : 2);
+      
+      node
+        .transition()
+        .duration(300)
+        .attr('fill', colorData.fill)
+        .attr('r', radius)
+        .attr('stroke', colorData.stroke)
+        .attr('stroke-width', strokeWidth);
+    });
+
+    // Color edges between highlighted nodes
+    const highlightedIdsSet = new Set(nodeColorMap.keys());
+    
+    svg.selectAll('line').each(function(d) {
+      const edge = d as D3Edge;
+      const sourceId = typeof edge.source === 'object' ? (edge.source as D3Node).id : String(edge.source);
+      const targetId = typeof edge.target === 'object' ? (edge.target as D3Node).id : String(edge.target);
+      
+      // Check if both nodes are highlighted
+      if (highlightedIdsSet.has(sourceId) && highlightedIdsSet.has(targetId)) {
+        const sourceColor = nodeColorMap.get(sourceId);
+        const targetColor = nodeColorMap.get(targetId);
+        
+        // Use the color if both nodes have the same color (same family)
+        if (sourceColor && targetColor && sourceColor.fill === targetColor.fill) {
+          d3.select(this)
+            .transition()
+            .duration(300)
+            .attr('stroke', sourceColor.fill)
+            .attr('stroke-width', 2)
+            .attr('stroke-opacity', 0.6);
+        }
+      }
+    });
+
+    console.log(`Highlighted ${nodeColorMap.size} nodes with family colors`);
+  }, [highlightedNodeIds, nodeFamilies, originalSearchNodes, graphData.nodes.length, isDarkMode]);
 
 
   if (graphData.nodes.length === 0) {
