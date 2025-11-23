@@ -1,7 +1,5 @@
-import { openai } from '@ai-sdk/openai';
-import { generateText, streamText } from 'ai';
+import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 
 type ProcessRequest = {
   text: string;
@@ -51,44 +49,70 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: 'OPENAI_API_KEY is not configured on server' },
+        { error: 'ANTHROPIC_API_KEY is not configured on server' },
         { status: 500 },
       );
     }
+
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
 
     const url = new URL(req.url);
     const wantStream =
       url.searchParams.get('stream') === '1' ||
       url.searchParams.get('stream') === 'true';
 
-    // Define tools for function calling
-    const tools = {
-      save_memory: {
+    // Define tools for function calling (Claude format)
+    const tools: Anthropic.Tool[] = [
+      {
+        name: 'save_memory',
         description:
           'Use this function when the user wants to save information to their second brain. ' +
           'This includes personal experiences, learnings, memories, notes, or any content they want to remember. ' +
           'Examples: "Remember that...", "Save this note...", "I learned today that..."',
-        parameters: z.object({
-          category: z.enum(CATEGORIES).describe('The category this memory belongs to. Must be one of the predefined categories.'),
-          source: z.enum(['chat', 'voice_note', 'conversation']).describe('The source of this memory. Must be one of the predefined sources.'),
-        }),
+        input_schema: {
+          type: 'object',
+          properties: {
+            category: {
+              type: 'string',
+              enum: CATEGORIES,
+              description: 'The category this memory belongs to. Must be one of the predefined categories.',
+            },
+            source: {
+              type: 'string',
+              enum: ['chat', 'voice_note', 'conversation'],
+              description: 'The source of this memory. Must be one of the predefined sources.',
+            },
+          },
+          required: ['category', 'source'],
+        },
       },
-      answer_question: {
+      {
+        name: 'answer_question',
         description:
           'Use this function when the user is asking a question or requesting information from their second brain. ' +
           'This retrieves relevant memories using RAG and constructs an answer based on stored context. ' +
           'Examples: "What did I learn about...?", "Tell me about...", "Do I have notes on...?"',
-        parameters: z.object({
-          needs_citation: z.boolean().describe('Whether to include source citations in the answer'),
-        }),
+        input_schema: {
+          type: 'object',
+          properties: {
+            needs_citation: {
+              type: 'boolean',
+              description: 'Whether to include source citations in the answer',
+            },
+          },
+          required: ['needs_citation'],
+        },
       },
-    } as const;
+    ];
 
-    // Step 1: Use GPT function calling to determine intent
-    const { toolCalls } = await generateText({
-      model: openai('gpt-4o-mini'),
+    // Step 1: Use Claude function calling to determine intent
+    const intentResponse = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022', // Latest Haiku model with tool support
+      max_tokens: 1024,
       system: [
         'You are an intent router for SecondBrain, a personal knowledge management system.',
         'Your job is to determine if the user wants to:',
@@ -102,19 +126,18 @@ export async function POST(req: Request) {
         '',
         'You must choose exactly ONE tool. Provide appropriate arguments for the chosen tool.',
       ].join('\n'),
-      prompt: text,
+      messages: [{ role: 'user', content: text }],
       tools,
-      toolChoice: 'required',
+      tool_choice: { type: 'any' },
       temperature: 0.4,
     });
 
     // Step 2: Execute the chosen tool
-    const call = toolCalls[0] as
-      | { toolName: 'save_memory'; args: { category: string; source: string } }
-      | { toolName: 'answer_question'; args: { needs_citation: boolean } }
-      | undefined;
+    const toolUse = intentResponse.content.find(
+      (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
+    );
 
-    if (!call) {
+    if (!toolUse) {
       return NextResponse.json(
         { error: 'No tool was selected by the model' },
         { status: 500 },
@@ -122,11 +145,12 @@ export async function POST(req: Request) {
     }
 
     // Execute save_memory
-    if (call.toolName === 'save_memory') {
+    if (toolUse.name === 'save_memory') {
+      const args = toolUse.input as { category: string; source: string };
       const memory = await saveMemory({
         text,
-        category: call.args?.category || body.category || 'general',
-        source: call.args?.source || body.source || 'web_chat',
+        category: args?.category || body.category || 'general',
+        source: args?.source || body.source || 'web_chat',
       });
       
       return NextResponse.json({
@@ -138,20 +162,23 @@ export async function POST(req: Request) {
     }
 
     // Execute answer_question
-    if (call.toolName === 'answer_question') {
-      const needsCitation = call.args?.needs_citation ?? false;
+    if (toolUse.name === 'answer_question') {
+      const args = toolUse.input as { needs_citation: boolean };
+      const needsCitation = args?.needs_citation ?? false;
       
       if (wantStream) {
         return streamAnswerWithRag({
           text,
           category: body.category || undefined,
           needsCitation,
+          anthropic,
         });
       } else {
         const { results, answer } = await answerWithRag({
           text,
           category: body.category || undefined,
           needsCitation,
+          anthropic,
         });
         
         return NextResponse.json({
@@ -185,6 +212,7 @@ function streamAnswerWithRag(input: {
   text: string;
   category?: string;
   needsCitation?: boolean;
+  anthropic: Anthropic;
 }) {
   return (async () => {
     // Step 1: Retrieve relevant memories from RAG
@@ -215,9 +243,10 @@ function streamAnswerWithRag(input: {
       .map((r) => `- [Memory ID ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
       .join('\n');
 
-    // Step 2: Stream the answer using retrieved context
-    const result = await streamText({
-      model: openai('gpt-4o-mini'),
+    // Step 2: Stream the answer using retrieved context with Claude
+    const stream = await input.anthropic.messages.stream({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 1024,
       system: [
         'You are SecondBrain, the user\'s digital second brain and personal knowledge assistant.',
         'Your role: Answer questions using ONLY the provided context from their stored memories.',
@@ -230,15 +259,42 @@ function streamAnswerWithRag(input: {
         '- When appropriate, include brief source mentions in parentheses (e.g., memory ID or excerpt).',
         '- Respect privacy: do not use external data or assume information not in context.',
       ].join('\n'),
-      prompt:
-        `User Question:\n${input.text}\n\n` +
-        `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
-        `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+      messages: [
+        {
+          role: 'user',
+          content:
+            `User Question:\n${input.text}\n\n` +
+            `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
+            `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+        },
+      ],
       temperature: 0.6,
+    });
+
+    // Create a readable stream for the response
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            if (
+              chunk.type === 'content_block_delta' &&
+              chunk.delta.type === 'text_delta'
+            ) {
+              const text = chunk.delta.text;
+              controller.enqueue(encoder.encode(text));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      },
     });
     
     // Return text stream for clean client display
-    return new Response(result.textStream, {
+    return new Response(readableStream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
@@ -283,6 +339,7 @@ async function answerWithRag(input: {
   text: string;
   category?: string;
   needsCitation?: boolean;
+  anthropic: Anthropic;
 }) {
   // Step 1: Retrieve relevant memories from RAG
   const params = new URLSearchParams({
@@ -312,9 +369,10 @@ async function answerWithRag(input: {
     .map((r) => `- [Memory ID ${r.memory.id}] ${r.memory.text.slice(0, 600)}`)
     .join('\n');
 
-  // Step 2: Generate answer using retrieved context
-  const { text } = await generateText({
-    model: openai('gpt-4o-mini'),
+  // Step 2: Generate answer using retrieved context with Claude
+  const response = await input.anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 1024,
     system: [
       'You are SecondBrain, the user\'s digital second brain and personal knowledge assistant.',
       'Your role: Answer questions using ONLY the provided context from their stored memories.',
@@ -327,19 +385,29 @@ async function answerWithRag(input: {
       '- When appropriate, include brief source mentions in parentheses (e.g., memory ID or excerpt).',
       '- Respect privacy: do not use external data or assume information not in context.',
     ].join('\n'),
-    prompt:
-      `User Question:\n${input.text}\n\n` +
-      `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
-      `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `User Question:\n${input.text}\n\n` +
+          `Available Context from Memory:\n${context || 'No context available.'}\n\n` +
+          `${input.needsCitation ? 'Include brief source citations.' : ''}`,
+      },
+    ],
     temperature: 0.6,
   });
+
+  // Extract text from response
+  const textContent = response.content.find(
+    (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
+  );
 
   return {
     results: search.map((r) => ({
       memory: r.memory,
       similarity_score: r.similarity_score,
     })),
-    answer: text,
+    answer: textContent?.text || '',
   };
 }
 
