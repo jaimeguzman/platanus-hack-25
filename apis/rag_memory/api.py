@@ -435,6 +435,29 @@ async def search_by_category(
         logger.error(f"Error searching by category: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/categories")
+async def get_all_categories():
+    """Get all available categories with memory counts."""
+    try:
+        from category_detector import CATEGORIES
+        
+        category_counts = []
+        for category in CATEGORIES:
+            count = rag_service.count_memories(category=category)
+            if count > 0:
+                category_counts.append({
+                    "category": category,
+                    "count": count
+                })
+        
+        return {
+            "categories": CATEGORIES,
+            "category_counts": category_counts
+        }
+    except Exception as e:
+        logger.error(f"Error getting categories: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # Graph endpoints
 @app.get("/memories/{memory_id}/neighbors", response_model=List[NeighborResult])
 async def get_memory_neighbors(

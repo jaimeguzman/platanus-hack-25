@@ -14,21 +14,30 @@ export function Dashboard() {
 
   const stats = useMemo(() => {
     const totalNotes = notes.length;
-    const careerNotes = notes.filter((n) => n.pillar === 'career').length;
-    const socialNotes = notes.filter((n) => n.pillar === 'social').length;
-    const hobbyNotes = notes.filter((n) => n.pillar === 'hobby').length;
+    const filteredNotesCount = filteredNotes.length;
     const totalTags = new Set(notes.flatMap((n) => n.tags)).size;
-    // Usar filteredNotes para las notas recientes (respetando el filtro de pilar)
+    
+    // Get top categories by note count
+    const categoryCount = notes.reduce((acc, note) => {
+      const category = note.pillar || 'Sin categoría';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const topCategories = Object.entries(categoryCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3);
+    
+    // Recent notes from filtered results
     const recentNotes = filteredNotes
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, APP_CONFIG.DASHBOARD_RECENT_NOTES_LIMIT);
 
     return {
       totalNotes,
-      careerNotes,
-      socialNotes,
-      hobbyNotes,
+      filteredNotesCount,
       totalTags,
+      topCategories,
       recentNotes,
     };
   }, [notes, filteredNotes]);
@@ -62,33 +71,37 @@ export function Dashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalNotes}</div>
               <p className="text-xs text-muted-foreground">
-                {filteredNotes.length} visibles
+                {stats.filteredNotesCount} visibles
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Etiquetas</CardTitle>
+              <CardTitle className="text-sm font-medium">Categorías</CardTitle>
               <Tag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalTags}</div>
               <p className="text-xs text-muted-foreground">
-                Categorías únicas
+                Etiquetas únicas
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Carrera</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stats.topCategories[0]?.[0] || 'Principal'}
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.careerNotes}</div>
+              <div className="text-2xl font-bold">
+                {stats.topCategories[0]?.[1] || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Notas profesionales
+                Categoría principal
               </p>
             </CardContent>
           </Card>
@@ -183,44 +196,26 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Pillars Overview */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Desarrollo de Carrera</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.careerNotes}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Notas profesionales
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Social</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.socialNotes}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Notas sociales
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Hobby</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.hobbyNotes}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Notas de hobbies
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Top Categories */}
+        {stats.topCategories.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-3">
+            {stats.topCategories.map(([category, count], index) => (
+              <Card key={category}>
+                <CardHeader>
+                  <CardTitle className="text-base">{category}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{count}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {index === 0 ? 'Categoría principal' : 
+                     index === 1 ? 'Segunda categoría' : 
+                     'Tercera categoría'}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

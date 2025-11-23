@@ -274,3 +274,87 @@ export async function fetchGraphStatistics(): Promise<GraphMetadata> {
   return response.json();
 }
 
+/**
+ * Get all memories from RAG
+ */
+export async function getAllMemories(
+  limit?: number,
+  offset: number = 0,
+  category?: string
+): Promise<MemoryResponse[]> {
+  try {
+    const params = new URLSearchParams({
+      offset: offset.toString(),
+    });
+
+    if (limit) {
+      params.append('limit', limit.toString());
+    }
+
+    if (category) {
+      params.append('category', category);
+    }
+
+    const response = await fetch(`${RAG_API_BASE_URL}/memories?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch memories: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching memories:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get memories by category
+ */
+export async function getMemoriesByCategory(
+  category: string,
+  limit?: number
+): Promise<MemoryResponse[]> {
+  try {
+    const params = new URLSearchParams();
+    
+    if (limit) {
+      params.append('limit', limit.toString());
+    }
+
+    const response = await fetch(
+      `${RAG_API_BASE_URL}/search/category/${encodeURIComponent(category)}?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch memories by category: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching memories by category:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all categories with their counts
+ */
+export async function getAllCategories(): Promise<{
+  categories: string[];
+  category_counts: Array<{ category: string; count: number }>;
+}> {
+  try {
+    const response = await fetch(`${RAG_API_BASE_URL}/categories`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch categories: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
+}
+

@@ -19,14 +19,14 @@ import { useToast } from '@/hooks/use-toast';
 export default function Home() {
   // Hooks deben estar al inicio, sin condiciones
   useNotes();
-  const { viewMode, setViewMode, setCurrentNote, addNote, selectedPillar } = useNoteStore();
+  const { viewMode, setViewMode, setCurrentNote, addNote, selectedCategory } = useNoteStore();
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const { toast } = useToast();
 
   const handleNewNote = () => {
     const now = new Date().toISOString();
-    const pillar = selectedPillar === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedPillar;
+    const pillar = selectedCategory === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedCategory;
     
     const newNote = {
       id: `note-${Date.now()}`,
@@ -59,8 +59,8 @@ export default function Home() {
         duration: Infinity, // Keep toast visible until we dismiss it
       });
 
-      // Get pillar for the note (not used for categorization, just for display)
-      const pillar = selectedPillar === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedPillar;
+      // Get category for the note (not used for categorization, just for display)
+      const pillar = selectedCategory === 'all' ? APP_CONFIG.DEFAULT_PILLAR : selectedCategory;
       
       // Call transcription API
       // Category will be auto-detected by the RAG service
