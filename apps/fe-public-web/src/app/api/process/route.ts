@@ -1,4 +1,3 @@
-// @ts-expect-error: types may not be available in this env
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 
