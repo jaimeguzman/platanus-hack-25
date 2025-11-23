@@ -25,7 +25,7 @@ interface NoteStore {
   setNotes: (notes: Note[]) => void;
   setCurrentNote: (note: Note | null) => void;
   addNote: (note: Note) => void;
-  updateNote: (id: string, updates: Partial<Note>) => void;
+  updateNote: (id: string, updates: Partial<Note>) => Promise<Note>;
   deleteNote: (id: string) => void;
   
   // Actions - UI
@@ -87,109 +87,34 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   
   addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
   
-  updateNote: (id, updates) =>
-    set((state) => {
-      // Detectar si es una nota nueva (ID temporal que empieza con "note-")
-      const isNewNote = id.startsWith('note-');
+  updateNote: async (id, updates) => {
+    const state = get();
+    
+    try {
+      // Call the service to update in RAG
+      const updatedNote = await updateNoteService(id, updates);
       
-      if (isNewNote) {
-        // Es una nota nueva, crear en Supabase primero
-        const note = state.notes.find((n) => n.id === id) || state.currentNote;
-        if (note) {
-          // Determinar el pillar: usar el de updates, luego el de la nota, luego el seleccionado
-          const pillar = updates.pillar ?? note.pillar ?? (state.selectedPillar === 'all' ? 'career' : state.selectedPillar);
-          
-          // Crear la nota en Supabase con los datos actualizados
-          const noteToCreate = {
-            title: updates.title ?? note.title,
-            content: updates.content ?? note.content,
-            tags: updates.tags ?? note.tags,
-            pillar: pillar as 'career' | 'social' | 'hobby',
-            isFavorite: updates.isFavorite ?? note.isFavorite,
-            linkedNotes: updates.linkedNotes ?? note.linkedNotes,
-          };
-          
-          createNoteService(noteToCreate)
-            .then((createdNote) => {
-              // Reemplazar la nota temporal con la nota real de Supabase
-              set((currentState) => {
-                const updatedNotes = currentState.notes.map((n) =>
-                  n.id === id ? createdNote : n,
-                );
-                const updatedCurrentNote =
-                  currentState.currentNote?.id === id ? createdNote : currentState.currentNote;
-                
-                return {
-                  notes: updatedNotes,
-                  currentNote: updatedCurrentNote,
-                  editorHasChanges: false,
-                };
-              });
-            })
-            .catch((error) => {
-              console.error('Error creating note in backend:', error);
-            });
-        }
-        
-        // Actualizar estado local inmediatamente mientras se crea en Supabase
-        const updatedNotes = state.notes.map((note) =>
-          note.id === id ? { ...note, ...updates, updatedAt: new Date().toISOString() } : note,
+      // Update local state
+      set((currentState) => {
+        const updatedNotes = currentState.notes.map((note) =>
+          note.id === id ? updatedNote : note,
         );
         const updatedCurrentNote =
-          state.currentNote?.id === id
-            ? { ...state.currentNote, ...updates, updatedAt: new Date().toISOString() }
-            : state.currentNote;
-        
-        // Sincronizar editor
-        if (state.currentNote?.id === id && updates.title !== undefined) {
-          set({ editorTitle: updates.title });
-        }
-        if (state.currentNote?.id === id && updates.content !== undefined) {
-          set({ editorContent: updates.content });
-        }
-        if (state.currentNote?.id === id && updates.tags !== undefined) {
-          set({ editorTags: updates.tags });
-        }
+          currentState.currentNote?.id === id ? updatedNote : currentState.currentNote;
         
         return {
           notes: updatedNotes,
           currentNote: updatedCurrentNote,
+          editorHasChanges: false,
         };
-      } else {
-        // Es una nota existente, actualizar normalmente
-        const updatedNotes = state.notes.map((note) =>
-          note.id === id ? { ...note, ...updates, updatedAt: new Date().toISOString() } : note,
-        );
-        const updatedCurrentNote =
-          state.currentNote?.id === id
-            ? { ...state.currentNote, ...updates, updatedAt: new Date().toISOString() }
-            : state.currentNote;
-        
-        // Si estamos editando esta nota, sincronizar el editor
-        if (state.currentNote?.id === id && updates.title !== undefined) {
-          set({ editorTitle: updates.title });
-        }
-        if (state.currentNote?.id === id && updates.content !== undefined) {
-          set({ editorContent: updates.content });
-        }
-        if (state.currentNote?.id === id && updates.tags !== undefined) {
-          set({ editorTags: updates.tags });
-        }
-        if (state.currentNote?.id === id) {
-          set({ editorHasChanges: false });
-        }
-        
-        // Persistir cambios en el backend de forma asíncrona
-        updateNoteService(id, updates).catch((error) => {
-          console.error('Error updating note in backend:', error);
-        });
-        
-        return {
-          notes: updatedNotes,
-          currentNote: updatedCurrentNote,
-        };
-      }
-    }),
+      });
+      
+      return updatedNote;
+    } catch (error) {
+      console.error('Error updating note:', error);
+      throw error;
+    }
+  },
   
   deleteNote: (id) =>
     set((state) => ({

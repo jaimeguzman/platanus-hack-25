@@ -6,7 +6,7 @@ import { useNoteStore } from '@/stores/noteStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Download, Eye, Edit, X, Star } from 'lucide-react';
+import { Download, Eye, Edit, X, Star, Save } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -15,17 +15,17 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from 'next-themes';
 import type { Components } from 'react-markdown';
 import { APP_CONFIG, UI_MESSAGES, DEFAULT_VALUES, FORMATTING } from '@/constants';
+import { useToast } from '@/hooks/use-toast';
+import { createNote as createNoteService } from '@/services/noteService';
 
 export function NoteEditor() {
   const {
     currentNote,
-    editorTitle,
     editorContent,
     editorTags,
     editorTagInput,
     editorViewMode,
     editorHasChanges,
-    setEditorTitle,
     setEditorContent,
     setEditorTagInput,
     setEditorViewMode,
@@ -33,11 +33,14 @@ export function NoteEditor() {
     removeEditorTag,
     updateNote,
     toggleNoteFavorite,
+    setViewMode,
+    addNote,
   } = useNoteStore();
 
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { theme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const { toast } = useToast();
 
   // Evitar hidration mismatch
   React.useEffect(() => {
@@ -76,38 +79,129 @@ export function NoteEditor() {
     };
   }, [theme, mounted]);
 
-  // Auto-save cuando hay cambios
-  useEffect(() => {
+  // Manual save handler
+  const handleSaveNote = async () => {
     if (!currentNote || !editorHasChanges) return;
 
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
+    let addingToGraphToast: { dismiss: () => void } | null = null;
 
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      updateNote(currentNote.id, {
-        title: editorTitle,
-        content: editorContent,
-        tags: editorTags,
-      });
-    }, APP_CONFIG.AUTO_SAVE_DELAY_MS);
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+    try {
+      setIsSaving(true);
+      
+      // Detect if it's a new note (temporary ID starts with "note-")
+      const isNewNote = currentNote.id.startsWith('note-');
+      
+      let savedNote;
+      if (isNewNote) {
+        // Create new note in RAG
+        const pillar = currentNote.pillar || 'career';
+        savedNote = await createNoteService({
+          title: editorContent.substring(0, 50),
+          content: editorContent,
+          tags: editorTags,
+          pillar: pillar as 'career' | 'social' | 'hobby',
+          isFavorite: currentNote.isFavorite || false,
+          linkedNotes: currentNote.linkedNotes || [],
+        });
+        
+        // At this point, the log "Note saved to RAG with ID: X" has already been printed
+        console.log('Nota guardada exitosamente, preparando para agregar al grafo...');
+      } else {
+        // Update existing note
+        savedNote = await updateNote(currentNote.id, {
+          title: editorContent.substring(0, 50),
+          content: editorContent,
+          tags: editorTags,
+        });
       }
-    };
-  }, [editorTitle, editorContent, editorTags, currentNote, editorHasChanges, updateNote]);
+
+      // After the note is saved and we have the RAG ID, show "adding to graph" message
+      if (savedNote) {
+        addNote(savedNote);
+        
+        // Show "adding to graph" toast AFTER we have the saved note from RAG
+        addingToGraphToast = toast({
+          title: "Agregando al grafo...",
+          description: "Conectando con conocimientos relacionados",
+          duration: Infinity,
+        });
+        
+        // Store the graph node data globally for the GraphView to pick up
+        const windowWithGraph = window as unknown as { 
+          pendingGraphNode?: {
+            node: {
+              id: string;
+              label: string;
+              type: string;
+              category?: string;
+              created_at?: string;
+            };
+            edges: {
+              source: string;
+              target: string;
+              weight: number;
+            }[];
+          };
+          focusPendingNode?: boolean;
+          onNodeAdded?: () => void;
+        };
+        
+        // Create graph node data from the saved note
+        windowWithGraph.pendingGraphNode = {
+          node: {
+            id: savedNote.ragMemoryId ? String(savedNote.ragMemoryId) : savedNote.id,
+            label: savedNote.content.substring(0, 50) + (savedNote.content.length > 50 ? '...' : ''),
+            type: 'memory',
+            category: savedNote.pillar,
+            created_at: savedNote.createdAt,
+          },
+          edges: [], // Edges will be loaded from the RAG
+        };
+        windowWithGraph.focusPendingNode = true;
+        
+        // Callback when node is added and focused
+        windowWithGraph.onNodeAdded = () => {
+          // Dismiss the loading toast
+          if (addingToGraphToast) {
+            addingToGraphToast.dismiss();
+          }
+          setIsSaving(false);
+          
+          // Show success toast
+          toast({
+            title: "¡Nota agregada al grafo!",
+            description: "Tu nota ha sido conectada exitosamente",
+          });
+        };
+      }
+
+      // Switch to graph view to show the new node
+      setViewMode('graph');
+    } catch (error) {
+      console.error('Error saving note:', error);
+      if (addingToGraphToast) {
+        addingToGraphToast.dismiss();
+      }
+      setIsSaving(false);
+      
+      toast({
+        title: "Error al guardar",
+        description: "No se pudo guardar la nota. Por favor intenta de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDownload = () => {
     if (!currentNote) return;
 
-    const markdown = `# ${editorTitle}\n\n${editorContent}\n\n${editorTags.map((tag) => `#${tag}`).join(' ')}`;
+    const markdown = `${editorContent}\n\n${editorTags.map((tag) => `#${tag}`).join(' ')}`;
     const blob = new Blob([markdown], { type: DEFAULT_VALUES.MARKDOWN_FILE_TYPE });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${editorTitle.replace(FORMATTING.FILE_NAME_REPLACE_PATTERN, FORMATTING.FILE_NAME_REPLACE_WITH)}${DEFAULT_VALUES.MARKDOWN_FILE_EXTENSION}`;
+    const filename = editorContent.substring(0, 30).replace(FORMATTING.FILE_NAME_REPLACE_PATTERN, FORMATTING.FILE_NAME_REPLACE_WITH) || 'note';
+    a.download = `${filename}${DEFAULT_VALUES.MARKDOWN_FILE_EXTENSION}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -129,20 +223,31 @@ export function NoteEditor() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col relative">
+      {/* Loading overlay */}
+      {isSaving && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Procesando nota...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="border-b p-4">
         <div className="flex items-center justify-between">
-          <Input
-            value={editorTitle}
-            onChange={(e) => setEditorTitle(e.target.value)}
-            placeholder={UI_MESSAGES.NOTE_TITLE_PLACEHOLDER}
-            className="text-xl font-semibold border-0 focus-visible:ring-0"
-          />
+          <h2 className="text-lg font-semibold">Nueva Nota</h2>
           <div className="flex items-center gap-2">
-            {editorHasChanges && (
-              <span className="text-xs text-muted-foreground">{UI_MESSAGES.SAVING}</span>
-            )}
+            <Button
+              variant={editorHasChanges ? "default" : "outline"}
+              size="icon"
+              onClick={handleSaveNote}
+              disabled={!editorHasChanges || isSaving}
+              title="Guardar nota"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -215,6 +320,7 @@ export function NoteEditor() {
             onChange={(e) => setEditorContent(e.target.value)}
             placeholder={UI_MESSAGES.NOTE_CONTENT_PLACEHOLDER}
             className="h-full w-full resize-none border-0 p-6 font-mono text-sm focus:outline-none"
+            disabled={isSaving}
           />
         ) : (
           <div className="prose prose-sm prose-slate max-w-none p-6 dark:prose-invert">

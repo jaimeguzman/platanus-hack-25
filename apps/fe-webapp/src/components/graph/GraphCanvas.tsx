@@ -23,7 +23,7 @@ export interface GraphCanvasRef {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
-  focusNode: (nodeId: string) => void;
+  focusNode: (nodeId: string) => boolean;
 }
 
 export function useGraphCanvas({
@@ -115,7 +115,7 @@ export function useGraphCanvas({
         .force('charge', d3.forceManyBody()
           .strength(-200) // Increased repulsion to give more space between nodes
         )
-        .force('center', d3.forceCenter(width / 2, height / 2)
+        .force('center', d3.forceCenter(width * 0.6, height / 2)
           .strength(0.08) // Reduced to allow more spreading
         )
         .force('collide', d3.forceCollide()
@@ -189,15 +189,22 @@ export function useGraphCanvas({
     
     const nodeMerge = nodeEnter.merge(nodeElements)
       .attr('r', d => {
-        const isNew = d.id === newNodeId;
-        if (isNew) return (d.size || 8) * 2;
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        if (isHighlighted) return (d.size || 8) * 2;
         return d.size || 8;
       })
       .attr('fill', d => d.color || GRAPH_COLORS.memory)
-      .attr('stroke', d => d.id === newNodeId ? HIGHLIGHT_SETTINGS.highlightColor : (isDarkMode ? (d.color || GRAPH_COLORS.memory) : '#fff'))
-      .attr('stroke-width', d => d.id === newNodeId ? 3 : 2)
+      .attr('stroke', d => {
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        return isHighlighted ? HIGHLIGHT_SETTINGS.highlightColor : (isDarkMode ? (d.color || GRAPH_COLORS.memory) : '#fff');
+      })
+      .attr('stroke-width', d => {
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        return isHighlighted ? 3 : 2;
+      })
       .style('filter', d => {
-        if (d.id === newNodeId) return `drop-shadow(0 0 10px ${HIGHLIGHT_SETTINGS.highlightColor})`;
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        if (isHighlighted) return `drop-shadow(0 0 10px ${HIGHLIGHT_SETTINGS.highlightColor})`;
         return 'none';
       });
 
@@ -234,17 +241,20 @@ export function useGraphCanvas({
     };
     
     const textMerge = textEnter.merge(textElements)
-      .attr('fill', d => d.id === newNodeId ? HIGHLIGHT_SETTINGS.highlightColor : (isDarkMode ? '#f9fafb' : '#111827'))
+      .attr('fill', d => {
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        return isHighlighted ? HIGHLIGHT_SETTINGS.highlightColor : (isDarkMode ? '#f9fafb' : '#111827');
+      })
       .attr('font-size', d => {
-        if (d.id === newNodeId) return 9;
-        if (d.id === selectedNodeId) return 8;
-        return 7;
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        return isHighlighted ? 9 : 7;
       })
       .attr('font-weight', d => (d.id === newNodeId || d.id === selectedNodeId) ? 'bold' : 'normal')
       .attr('opacity', d => shouldShowLabel(d.id) ? 1 : 0)
       .text(d => {
-        // Show full label for selected node
-        if (d.id === selectedNodeId) {
+        // Show full label for selected/highlighted node
+        const isHighlighted = d.id === newNodeId || d.id === selectedNodeId;
+        if (isHighlighted) {
           return d.label;
         }
         // Truncate other labels
@@ -298,19 +308,27 @@ export function useGraphCanvas({
     };
   }, []);
 
-  const focusNode = useCallback((nodeId: string) => {
-    if (!svgRef.current || !zoomRef.current || !containerRef.current) return;
+  const focusNode = useCallback((nodeId: string): boolean => {
+    if (!svgRef.current || !zoomRef.current || !containerRef.current) {
+      console.log('Focus failed: Missing refs');
+      return false;
+    }
     
     const node = graphData.nodes.find(n => n.id === nodeId);
-    if (!node || node.x === undefined || node.y === undefined) return;
+    if (!node) {
+      console.log('Focus failed: Node not found');
+      return false;
+    }
+    
+    if (node.x === undefined || node.y === undefined) {
+      console.log('Focus failed: Node position not calculated yet');
+      return false;
+    }
 
-    // Freeze the node position so it doesn't drift after zoom
-    node.fx = node.x;
-    node.fy = node.y;
-
-    // Stop simulation to prevent movement
-    if (simulationRef.current) {
-      simulationRef.current.stop();
+    // Check if position is valid (not NaN)
+    if (isNaN(node.x) || isNaN(node.y)) {
+      console.log('Focus failed: Node position not stable yet', { x: node.x, y: node.y });
+      return false;
     }
 
     const svg = d3.select(svgRef.current);
@@ -318,24 +336,17 @@ export function useGraphCanvas({
     const width = containerRect.width || 800;
     const height = containerRect.height || 600;
 
+    // Calculate transform to center the node
     const transform = d3.zoomIdentity
-      .translate(width / 2, height / 2)
-      .scale(2)
+      .translate(width / 3, height / 2)
+      .scale(1)
       .translate(-node.x, -node.y);
+    console.log('Transform:', transform);
 
-    // Instant zoom without animation
+    // Apply transform directly without animation for reliability
     svg.call(zoomRef.current.transform, transform);
-
-    // Release the node position after a short delay and restart simulation
-    setTimeout(() => {
-      if (node) {
-        node.fx = null;
-        node.fy = null;
-      }
-      if (simulationRef.current) {
-        simulationRef.current.alpha(0.1).restart();
-      }
-    }, 100);
+    
+    return true;
   }, [graphData.nodes]);
 
   const resetZoom = useCallback(() => {

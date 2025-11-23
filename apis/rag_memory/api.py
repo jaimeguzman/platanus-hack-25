@@ -52,21 +52,39 @@ class MemoryUpdate(BaseModel):
     category: Optional[str] = Field(None, description="New category")
     source: Optional[str] = Field(None, description="New source")
 
+class GraphNode(BaseModel):
+    id: str
+    label: str
+    type: str
+    category: Optional[str] = None
+    created_at: Optional[str] = None
+
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+    weight: float
+
+class GraphNodeData(BaseModel):
+    node: GraphNode
+    edges: List[GraphEdge]
+
 class MemoryResponse(BaseModel):
     id: int
     text: str
     category: Optional[str]
     source: Optional[str]
     created_at: str
+    graph_node: Optional[GraphNodeData] = None
 
     @classmethod
-    def from_memory(cls, memory: Memory) -> "MemoryResponse":
+    def from_memory(cls, memory: Memory, graph_node: Optional[GraphNodeData] = None) -> "MemoryResponse":
         return cls(
             id=memory.id,
             text=memory.text,
             category=memory.category,
             source=memory.source,
             created_at=memory.created_at.isoformat() if memory.created_at else "",
+            graph_node=graph_node,
         )
 
 class SearchResult(BaseModel):
@@ -191,6 +209,63 @@ def _generate_answer_with_context(query: str, results: List[Any]) -> str:
         logger.error(f"Answer generation failed: {e}")
         return "No pude generar una respuesta con el contexto disponible."
 
+def _build_graph_node_data(memory: Memory, limit: int = 10) -> GraphNodeData:
+    """
+    Build GraphNodeData for a given memory including its neighbors.
+    
+    Args:
+        memory: The Memory object
+        limit: Maximum number of neighbors to include
+        
+    Returns:
+        GraphNodeData with node and edges
+    """
+    try:
+        # Get neighbors from the RAG service
+        neighbors = rag_service.get_memory_neighbors(memory_id=memory.id, limit=limit)
+        
+        # Format the text for label
+        text = memory.text or ""
+        label = (text[:80] + "...") if len(text) > 80 else text
+        
+        # Build the node
+        graph_node = GraphNode(
+            id=str(memory.id),
+            label=label,
+            type="memory",
+            category=memory.category,
+            created_at=memory.created_at.isoformat() if memory.created_at else None,
+        )
+        
+        # Build the edges
+        edges = [
+            GraphEdge(
+                source=str(memory.id),
+                target=str(neighbor_id),
+                weight=score,
+            )
+            for neighbor_id, score in neighbors
+        ]
+        
+        return GraphNodeData(node=graph_node, edges=edges)
+        
+    except Exception as e:
+        logger.error(f"Error building graph node data for memory {memory.id}: {e}")
+        # Return a basic node structure even if we can't get neighbors
+        text = memory.text or ""
+        label = (text[:80] + "...") if len(text) > 80 else text
+        
+        return GraphNodeData(
+            node=GraphNode(
+                id=str(memory.id),
+                label=label,
+                type="memory",
+                category=memory.category,
+                created_at=memory.created_at.isoformat() if memory.created_at else None,
+            ),
+            edges=[]
+        )
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -207,7 +282,11 @@ async def create_memory(memory_data: MemoryCreate):
             category=memory_data.category,
             source=memory_data.source,
         )
-        return MemoryResponse.from_memory(memory)
+        
+        # Build graph node data for the newly created memory
+        graph_node = _build_graph_node_data(memory, limit=10)
+        
+        return MemoryResponse.from_memory(memory, graph_node=graph_node)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -257,7 +336,11 @@ async def update_memory(
         )
         if not memory:
             raise HTTPException(status_code=404, detail="Memory not found")
-        return MemoryResponse.from_memory(memory)
+        
+        # Build graph node data for the updated memory
+        graph_node = _build_graph_node_data(memory, limit=10)
+        
+        return MemoryResponse.from_memory(memory, graph_node=graph_node)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
