@@ -46,8 +46,8 @@ class RagConfig:
     max_search_limit: int = 100
     
     # Chunking settings
-    chunk_size_words: int = 100  # Number of words per chunk
-    chunk_overlap_words: int = 80  # Number of overlapping words between chunks
+    chunk_size_words: int = 200  # Number of words per chunk
+    chunk_overlap_words: int = 40  # Number of overlapping words between chunks
     
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")

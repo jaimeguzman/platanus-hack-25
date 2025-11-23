@@ -10,7 +10,7 @@ class TextChunker:
     Handles splitting text into overlapping chunks based on word count.
     """
 
-    def __init__(self, chunk_size_words: int = 400, overlap_words: int = 80):
+    def __init__(self, chunk_size_words: int = 200, overlap_words: int = 40):
         """
         Initialize the text chunker.
         

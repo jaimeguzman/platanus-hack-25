@@ -63,9 +63,9 @@ Original Text (1000 words)
     Text Chunker
          ↓
 ┌────────┴────────┐
-│  Chunk 1 (400w) │ → Embedding 1
-│  Chunk 2 (400w) │ → Embedding 2  (80 words overlap with Chunk 1)
-│  Chunk 3 (400w) │ → Embedding 3  (80 words overlap with Chunk 2)
+│  Chunk 1 (200w) │ → Embedding 1
+│  Chunk 2 (200w) │ → Embedding 2  (40 words overlap with Chunk 1)
+│  Chunk 3 (200w) │ → Embedding 3  (40 words overlap with Chunk 2)
 └─────────────────┘
 ```
 
@@ -74,8 +74,8 @@ Original Text (1000 words)
 Default chunking parameters (configurable in `config.py`):
 
 ```python
-chunk_size_words: int = 400      # Number of words per chunk
-chunk_overlap_words: int = 80    # Overlapping words between chunks
+chunk_size_words: int = 200      # Number of words per chunk
+chunk_overlap_words: int = 40    # Overlapping words between chunks
 ```
 
 ### Similarity Calculation
