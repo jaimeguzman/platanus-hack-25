@@ -49,19 +49,6 @@ services:
       - ./apis/speech_to_text_api:/app
     command: python main.py
 
-  # API SST (Speech to Text standalone)
-  api-sst:
-    build:
-      context: ./apis/api-sst
-      dockerfile: Dockerfile
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    ports:
-      - "8002:8000"
-    volumes:
-      - ./apis/api-sst:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
   # Frontend Public Web
   fe-public-web:
     build:
