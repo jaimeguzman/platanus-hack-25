@@ -8,6 +8,7 @@ python-dotenv==1.2.1
 # FastAPI and web server
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
+mangum==0.17.0
 
 # Data processing
 numpy==2.2.6

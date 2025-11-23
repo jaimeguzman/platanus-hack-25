@@ -10,6 +10,7 @@ python-dotenv==1.2.1
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 pydantic==2.12.4
+mangum==0.17.0
 
 # Utilities
 certifi==2025.11.12
