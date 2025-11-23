@@ -35,19 +35,19 @@ services:
     command: python main.py
 
   # API Speech to Text (comentado - requiere ELEVENLABS_API_KEY)
-  # speech-to-text:
-  #   build:
-  #     context: ./apis/speech_to_text_api
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
-  #     - RAG_SERVICE_URL=http://rag-memory:8000
-  #   ports:
-  #     - "8001:8001"
-  #   volumes:
-  #     - ./apis/speech_to_text_api:/app
-  #   command: python main.py
+  speech-to-text:
+    build:
+      context: ./apis/speech_to_text_api
+      dockerfile: Dockerfile
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - RAG_SERVICE_URL=http://rag-memory:8000
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./apis/speech_to_text_api:/app
+    command: python main.py
 
   # API SST (Speech to Text standalone)
   api-sst:
