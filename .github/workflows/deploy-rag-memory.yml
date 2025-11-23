@@ -1,0 +1,52 @@
+name: Deploy RAG Memory Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apis/rag_memory/**'
+      - '.github/workflows/deploy-rag-memory.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: apis/rag_memory
+        run: |
+          pip install -r requirements.txt -t . --no-cache-dir
+
+      - name: Clean unnecessary files
+        working-directory: apis/rag_memory
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete
+          find . -name "*.pyo" -delete
+
+      - name: Create deployment package
+        run: |
+          cd apis/rag_memory
+          zip -r ../../rag-memory.zip . -x "*.git*" "__pycache__/*" "*.pyc"
+
+      - name: Deploy to Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          AWS_REGION: us-west-2
+        run: |
+          aws lambda update-function-code \
+            --function-name rag-memory-lambda \
+            --zip-file fileb://rag-memory.zip \
+            --region $AWS_REGION
