@@ -13,7 +13,7 @@ applications:
             - echo "NEXT_PUBLIC_RAG_API_URL=$NEXT_PUBLIC_RAG_API_URL" >> .env.production
             - npm run build
       artifacts:
-        baseDirectory: .next
+        baseDirectory: out
         files:
           - '**/*'
       cache:
