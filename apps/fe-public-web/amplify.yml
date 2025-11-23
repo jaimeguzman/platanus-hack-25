@@ -1,4 +1,6 @@
 version: 1
+framework:
+  name: next
 applications:
   - frontend:
       phases:
@@ -13,7 +15,7 @@ applications:
             - echo "NEXT_PUBLIC_RAG_API_URL=$NEXT_PUBLIC_RAG_API_URL" >> .env.production
             - npm run build
       artifacts:
-        baseDirectory: out
+        baseDirectory: .next
         files:
           - '**/*'
       cache:
@@ -22,3 +24,4 @@ applications:
           - .npm/**/*
           - node_modules/**/*
     appRoot: apps/fe-public-web
+    platform: WEB_COMPUTE

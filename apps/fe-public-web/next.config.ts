@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
-  output: 'export',
+  // No output specified - defaults to server-side rendering
 };
 
 export default config;
