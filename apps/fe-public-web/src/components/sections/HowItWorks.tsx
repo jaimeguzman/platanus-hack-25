@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Brain, Zap, Network, Sparkles, ArrowRight, Radio } from 'lucide-react';
+import { Brain, Network, Sparkles, ArrowRight, Radio } from 'lucide-react';
 
 const neuralSteps = [
   {
@@ -242,30 +242,6 @@ export function HowItWorks() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* CTA */}
-        <div className="text-center mt-16">
-          <button className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 
-                           text-white rounded-2xl font-semibold hover:from-blue-700 hover:via-purple-700 
-                           hover:to-pink-700 transition-all duration-300 transform hover:scale-105 
-                           shadow-2xl hover:shadow-blue-500/25">
-            <span className="flex items-center gap-3">
-              Unirse a Lista de Espera
-              <Zap size={20} className="group-hover:scale-110 transition-transform" />
-            </span>
-            <div className="absolute -top-2 -right-2 px-2 py-1 text-xs bg-orange-500 text-white rounded-full font-medium animate-pulse">
-              Beta
-            </div>
-            
-            {/* Neural Glow */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 
-                          opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
-          </button>
-          
-          <p className="text-sm text-[#999999] mt-4">
-            Acceso anticipado limitado. Tu transformación neural comienza pronto.
-          </p>
         </div>
       </div>
     </section>

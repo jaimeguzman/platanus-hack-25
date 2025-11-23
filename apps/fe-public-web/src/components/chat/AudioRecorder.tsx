@@ -134,7 +134,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     >
       <button
         onClick={handleCancel}
-        className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150"
+        className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer"
         style={{
           backgroundColor: `rgba(239, 68, 68, ${0.1 + cancelProgress * 0.9})`,
           color: cancelProgress > 0.5 ? 'white' : 'rgb(239, 68, 68)',
@@ -166,7 +166,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
       <button
         onClick={handleSend}
         disabled={isCancelling}
-        className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center transition-all duration-150 shadow-lg"
+        className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center transition-all duration-150 shadow-lg cursor-pointer"
         style={{
           transform: `scale(${isCancelling ? 0.8 : 1})`,
         }}

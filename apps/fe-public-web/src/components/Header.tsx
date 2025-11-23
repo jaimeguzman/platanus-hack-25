@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { WaitlistModal } from './WaitlistModal';
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const navItems = [
     { label: 'Características', href: '#features' },
@@ -46,19 +48,12 @@ export function Header() {
                 <div className="text-xs text-[#999999]">Acceso Exclusivo</div>
                 <div className="text-sm font-medium text-blue-400">Próximamente</div>
               </div>
-              <button className="px-4 py-2 border border-blue-500/30 text-blue-400 rounded-lg text-sm font-medium 
-                               hover:bg-blue-500/10 hover:border-blue-500/50 transition-all duration-300 
-                               relative overflow-hidden group">
-                <span className="relative z-10">Unirse</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 
-                             transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              </button>
             </div>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden p-2 hover:bg-[#1A1A1A] rounded-lg transition-colors"
+              className="md:hidden p-2 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
             >
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -85,15 +80,25 @@ export function Header() {
                 <div className="text-lg font-medium text-blue-400">Próximamente</div>
                 <div className="text-xs text-[#666666] mt-1">Sé de los primeros en acceder</div>
               </div>
-              <button className="w-full px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 
+              <button 
+                onClick={() => {
+                  setIsModalOpen(true);
+                  setIsOpen(false);
+                }}
+                className="w-full px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 
                                rounded-lg text-sm font-medium hover:bg-blue-500/20 hover:border-blue-500/50 
-                               transition-all duration-300">
+                               transition-all duration-300 cursor-pointer">
                 Unirse a Lista de Espera
               </button>
             </div>
           </div>
         )}
       </div>
+
+      <WaitlistModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </header>
   );
 }

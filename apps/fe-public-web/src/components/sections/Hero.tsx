@@ -1,10 +1,15 @@
 'use client';
 
-import { ArrowRight, Zap, Brain, Sparkles } from 'lucide-react';
+import { ArrowRight, Brain, Sparkles, Zap } from 'lucide-react';
+import { useState } from 'react';
 import { NeuralNetworkBackground } from '../NeuralNetworkBackground';
+import { WaitlistModal } from '../WaitlistModal';
 
 export function Hero() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
+    <>
     <section className="relative min-h-[90vh] flex items-center justify-center pt-20 pb-12 overflow-hidden">
       {/* Neural Network Background */}
       <NeuralNetworkBackground />
@@ -45,9 +50,12 @@ export function Hero() {
             </p>
           </div>
 
-          {/* CTA Buttons - FOMO Version */}
+          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 z-20 relative">
-            <button className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 cursor-pointer"
+            >
               <span className="flex items-center gap-2">
                 Obtén Acceso Temprano
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -58,7 +66,10 @@ export function Hero() {
               </div>
             </button>
             
-            <button className="group relative px-8 py-4 border-2 border-[#2A2A2A] text-[#E5E5E5] rounded-xl font-semibold hover:bg-[#1A1A1A] hover:border-blue-500/50 transition-all duration-300 backdrop-blur-sm">
+            <button 
+              onClick={() => document.getElementById('chat')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group relative px-8 py-4 border-2 border-[#2A2A2A] text-[#E5E5E5] rounded-xl font-semibold hover:bg-[#1A1A1A] hover:border-blue-500/50 transition-all duration-300 backdrop-blur-sm cursor-pointer"
+            >
               <span className="flex items-center gap-2">
                 <Zap size={20} className="text-blue-500" />
                 Ver Demo
@@ -96,5 +107,11 @@ export function Hero() {
         </div>
       </div>
     </section>
+
+    <WaitlistModal 
+      isOpen={isModalOpen} 
+      onClose={() => setIsModalOpen(false)} 
+    />
+    </>
   );
 }

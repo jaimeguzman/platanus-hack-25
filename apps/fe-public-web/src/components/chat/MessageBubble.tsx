@@ -31,7 +31,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
           <button
             type="button"
             onClick={() => onRetry?.(message.id)}
-            className="hover:opacity-80 transition-opacity"
+            className="hover:opacity-80 transition-opacity cursor-pointer"
           >
             <AlertCircle className="w-3.5 h-3.5 text-red-500" />
           </button>
@@ -95,4 +95,3 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     </div>
   );
 }
-
