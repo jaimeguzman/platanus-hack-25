@@ -2,6 +2,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Note } from '@/types/note';
 import { NoteServiceError, ERROR_CODES } from '@/lib/errors';
 import { DB_TABLES } from '@/constants';
+import { saveNoteToRag, updateNoteInRag, deleteNoteFromRag } from './ragService';
 
 // Mapeo de pillar a project_id (cache)
 const PILLAR_TO_PROJECT_ID: Record<string, string> = {};
@@ -10,6 +11,9 @@ const PROJECT_NAME_TO_PILLAR: Record<string, 'career' | 'social' | 'hobby'> = {
   'Social': 'social',
   'Hobby': 'hobby',
 };
+
+// NOTE: Las notas ahora se guardan SOLO en RAG, no en Supabase
+// Las funciones createNote y updateNote ahora solo manejan RAG
 
 // Obtener project_id desde pillar
 async function getProjectIdByPillar(pillar: 'career' | 'social' | 'hobby'): Promise<string> {
@@ -60,46 +64,15 @@ async function fetchLinkedNotes(noteId: string): Promise<string[]> {
 }
 
 /**
- * Obtiene todas las notas con sus tags y backlinks desde la vista notes_full
+ * Obtiene todas las notas desde el RAG
  */
 export async function fetchNotes(): Promise<Note[]> {
   try {
-    const supabase = getSupabaseClient();
-    
-    // Usar la vista notes_full para obtener tags automáticamente
-    const { data: notesData, error: notesError } = await supabase
-      .from('notes_full')
-      .select('*')
-      .order('updated_at', { ascending: false });
-
-    if (notesError) {
-      throw new NoteServiceError(
-        `Failed to fetch notes: ${notesError.message}`,
-        ERROR_CODES.FETCH_FAILED,
-      );
-    }
-
-    if (!notesData) {
-      throw new NoteServiceError(
-        'No data returned from database',
-        ERROR_CODES.FETCH_FAILED,
-      );
-    }
-
-    // Obtener backlinks para todas las notas en paralelo
-    const notesWithBacklinks = await Promise.all(
-      notesData.map(async (note) => {
-        const noteRecord = note as Record<string, unknown>;
-        const noteId = noteRecord.id as string;
-        const linkedNotes = await fetchLinkedNotes(noteId);
-        return {
-          ...noteRecord,
-          linked_notes: linkedNotes,
-        };
-      }),
-    );
-
-    return notesWithBacklinks.map(mapDbNoteToNote);
+    // For now, return empty array as we'll need to implement a way to get all memories from RAG
+    // The RAG doesn't have a direct concept of "notes" separate from memories
+    // We'll need to filter by source='text_new_note' when the RAG API supports it
+    console.warn('fetchNotes: Notes are now stored in RAG only. Returning empty array for now.');
+    return [];
   } catch (error) {
     console.error('Error fetching notes:', error);
     throw error;
@@ -210,163 +183,102 @@ async function syncBacklinks(noteId: string, linkedNotes: string[]): Promise<voi
 
 export async function createNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
   try {
-    const supabase = getSupabaseClient();
+    const pillar = note.pillar ?? 'career';
     const now = new Date().toISOString();
     
-    // Obtener user_id del contexto (por ahora usar el primer usuario disponible)
-    // TODO: Integrar con autenticación real
-    const { data: firstUser } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1)
-      .single();
-
-    const firstUserRecord = firstUser as { id?: string } | null;
-    if (!firstUserRecord?.id) {
-      throw new NoteServiceError(
-        'No user found. Please ensure users table has at least one user.',
-        ERROR_CODES.CREATE_FAILED,
-      );
-    }
-
-    const userId = firstUserRecord.id;
-    const isFavorite = note.isFavorite ?? false;
-    const pillar = note.pillar ?? 'career';
-    const projectId = await getProjectIdByPillar(pillar);
+    // Save ONLY to RAG (no Supabase)
+    const noteText = `${note.title}\n\n${note.content}`;
+    const ragResponse = await saveNoteToRag(
+      noteText,
+      pillar,
+      'text_new_note'
+    );
     
-    // Crear la nota en la tabla notes
-    const { data: noteData, error: noteError } = await supabase
-      .from(DB_TABLES.NOTES)
-      .insert({
-        user_id: userId,
-        project_id: projectId,
-        title: note.title,
-        content: note.content,
-        is_favorite: isFavorite,
-        created_at: now,
-        updated_at: now,
-      } as never)
-      .select()
-      .single();
-
-    if (noteError || !noteData) {
-      throw new NoteServiceError(
-        `Failed to create note: ${noteError?.message || 'No data returned'}`,
-        ERROR_CODES.CREATE_FAILED,
-      );
-    }
-
-    const noteDataRecord = noteData as { id: string };
-    const noteId = noteDataRecord.id;
-
-    // Sincronizar tags
-    if (note.tags && note.tags.length > 0) {
-      await syncTags(noteId, note.tags, userId);
-    }
-
-    // Sincronizar backlinks
-    if (note.linkedNotes && note.linkedNotes.length > 0) {
-      await syncBacklinks(noteId, note.linkedNotes);
-    }
-
-    // Obtener la nota completa desde notes_full
-    const { data: fullNote, error: fetchError } = await supabase
-      .from('notes_full')
-      .select('*')
-      .eq('id', noteId)
-      .single();
-
-    if (fetchError || !fullNote) {
-      // Si falla, usar los datos básicos y mapear manualmente
-      const linkedNotes = note.linkedNotes ?? [];
-      return mapDbNoteToNote({
-        ...(noteData as Record<string, unknown>),
-        tags: note.tags || [],
-        linked_notes: linkedNotes,
-      });
-    }
-
-    const linkedNotes = await fetchLinkedNotes(noteId);
-    return mapDbNoteToNote({
-      ...(fullNote as Record<string, unknown>),
-      linked_notes: linkedNotes,
-    });
+    const memoryId = ragResponse.memory.id;
+    console.log('Note saved to RAG with ID:', memoryId);
+    
+    // Create a Note object from the RAG response
+    const createdNote: Note = {
+      id: String(memoryId), // Use memory ID as note ID
+      title: note.title,
+      content: note.content,
+      tags: note.tags || [],
+      pillar,
+      isFavorite: note.isFavorite ?? false,
+      createdAt: ragResponse.memory.created_at || now,
+      updatedAt: ragResponse.memory.created_at || now,
+      linkedNotes: note.linkedNotes || [],
+      ragMemoryId: memoryId,
+    };
+    
+    return createdNote;
   } catch (error) {
     console.error('Error creating note:', error);
-    throw error;
+    throw new NoteServiceError(
+      `Failed to create note: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      ERROR_CODES.CREATE_FAILED,
+    );
   }
 }
 
 export async function updateNote(id: string, updates: Partial<Note>): Promise<Note> {
   try {
-    const supabase = getSupabaseClient();
-    const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
-
-    // Actualizar campos directos de la tabla notes
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.content !== undefined) updateData.content = updates.content;
-    if (updates.pillar !== undefined) {
-      const projectId = await getProjectIdByPillar(updates.pillar);
-      updateData.project_id = projectId;
-    }
-    if (updates.isFavorite !== undefined) updateData.is_favorite = updates.isFavorite;
-
-    // Actualizar la nota en la tabla notes
-    const { data: noteData, error: noteError } = await supabase
-      .from(DB_TABLES.NOTES)
-      .update(updateData as never)
-      .eq('id', id)
-      .select('user_id')
-      .single();
-
-    if (noteError) {
+    const now = new Date().toISOString();
+    
+    // Parse memory ID from note ID (if it's a number, it's from RAG)
+    const memoryId = parseInt(id);
+    
+    if (isNaN(memoryId)) {
       throw new NoteServiceError(
-        `Failed to update note: ${noteError.message}`,
+        'Invalid note ID format',
         ERROR_CODES.UPDATE_FAILED,
       );
     }
 
-    if (!noteData) {
-      throw new NoteServiceError(
-        `Note with id ${id} not found`,
-        ERROR_CODES.NOT_FOUND,
+    // Update in RAG if content or title changed
+    if (updates.title !== undefined || updates.content !== undefined) {
+      // We need to get the current note to have complete data
+      // For now, we'll require both title and content in updates
+      if (!updates.title || !updates.content) {
+        throw new NoteServiceError(
+          'Both title and content are required for updates',
+          ERROR_CODES.UPDATE_FAILED,
+        );
+      }
+      
+      const noteText = `${updates.title}\n\n${updates.content}`;
+      const pillar = updates.pillar;
+      
+      const ragResponse = await updateNoteInRag(
+        memoryId,
+        noteText,
+        pillar,
+        'text_new_note'
       );
+      
+      console.log('Note updated in RAG:', memoryId);
+      
+      // Return updated note
+      return {
+        id: String(memoryId),
+        title: updates.title,
+        content: updates.content,
+        tags: updates.tags || [],
+        pillar: pillar || 'career',
+        isFavorite: updates.isFavorite ?? false,
+        createdAt: ragResponse.memory.created_at || now,
+        updatedAt: now,
+        linkedNotes: updates.linkedNotes || [],
+        ragMemoryId: memoryId,
+      };
     }
-
-    const noteDataRecord = noteData as { user_id: string };
-    const userId = noteDataRecord.user_id;
-
-    // Sincronizar tags si se actualizaron
-    if (updates.tags !== undefined) {
-      await syncTags(id, updates.tags, userId);
-    }
-
-    // Sincronizar backlinks si se actualizaron
-    if (updates.linkedNotes !== undefined) {
-      await syncBacklinks(id, updates.linkedNotes);
-    }
-
-    // Obtener la nota completa desde notes_full
-    const { data: fullNote, error: fetchError } = await supabase
-      .from('notes_full')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !fullNote) {
-      throw new NoteServiceError(
-        `Failed to fetch updated note: ${fetchError?.message || 'No data returned'}`,
-        ERROR_CODES.FETCH_FAILED,
-      );
-    }
-
-    const linkedNotes = await fetchLinkedNotes(id);
-    return mapDbNoteToNote({
-      ...(fullNote as Record<string, unknown>),
-      linked_notes: linkedNotes,
-    });
+    
+    // If only non-content fields changed, just return the note with updates
+    // (we don't store these in RAG)
+    throw new NoteServiceError(
+      'No content to update',
+      ERROR_CODES.UPDATE_FAILED,
+    );
   } catch (error) {
     console.error('Error updating note:', error);
     throw error;
@@ -375,21 +287,19 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<No
 
 export async function deleteNote(id: string): Promise<boolean> {
   try {
-    const supabase = getSupabaseClient();
+    // Parse memory ID from note ID
+    const memoryId = parseInt(id);
     
-    // Las relaciones (note_tags, note_backlinks) se eliminan automáticamente
-    // por CASCADE según el schema
-    const { error } = await supabase
-      .from(DB_TABLES.NOTES)
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+    if (isNaN(memoryId)) {
       throw new NoteServiceError(
-        `Failed to delete note: ${error.message}`,
+        'Invalid note ID format',
         ERROR_CODES.DELETE_FAILED || 'DELETE_FAILED',
       );
     }
+
+    // Delete from RAG only (no Supabase)
+    await deleteNoteFromRag(memoryId);
+    console.log('Note deleted from RAG:', memoryId);
 
     return true;
   } catch (error) {
@@ -527,16 +437,21 @@ function mapDbNoteToNote(dbNote: Record<string, unknown>): Note {
     ? (dbNote.linked_notes as string[])
     : [];
   
-  // is_favorite puede ser boolean o null/undefined
-  const isFavorite = typeof dbNote.is_favorite === 'boolean' 
-    ? dbNote.is_favorite 
-    : dbNote.is_pinned === true; // Fallback a is_pinned si is_favorite no existe
+  // is_favorite puede ser boolean o null/undefined, mapear desde is_pinned
+  const isFavorite = typeof dbNote.is_pinned === 'boolean' 
+    ? dbNote.is_pinned 
+    : false;
 
   // Mapear project_name a pillar, o usar pillar si existe (compatibilidad)
   const projectName = dbNote.project_name as string | undefined;
   const pillar = projectName && PROJECT_NAME_TO_PILLAR[projectName]
     ? PROJECT_NAME_TO_PILLAR[projectName]
     : ((dbNote.pillar as 'career' | 'social' | 'hobby') || 'career');
+
+  // Get memory_id if available
+  const ragMemoryId = typeof dbNote.memory_id === 'number' 
+    ? dbNote.memory_id 
+    : undefined;
 
   return {
     id: dbNote.id as string,
@@ -548,6 +463,7 @@ function mapDbNoteToNote(dbNote: Record<string, unknown>): Note {
     createdAt: (dbNote.created_at as string) || new Date().toISOString(),
     updatedAt: (dbNote.updated_at as string) || new Date().toISOString(),
     linkedNotes,
+    ragMemoryId,
   };
 }
 

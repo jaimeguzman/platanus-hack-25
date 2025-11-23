@@ -9,9 +9,10 @@ import type { D3Node } from '@/types/graph';
 interface GraphNodeListProps {
   nodes: D3Node[];
   onNodeClick: (nodeId: string) => void;
+  selectedNodeId?: string | null;
 }
 
-export function GraphNodeList({ nodes, onNodeClick }: GraphNodeListProps) {
+export function GraphNodeList({ nodes, onNodeClick, selectedNodeId }: GraphNodeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredNodes = nodes.filter(node => 
@@ -41,8 +42,10 @@ export function GraphNodeList({ nodes, onNodeClick }: GraphNodeListProps) {
           {filteredNodes.map((node) => (
             <Button
               key={node.id}
-              variant="ghost"
-              className="w-full justify-start text-xs h-auto py-1.5"
+              variant={selectedNodeId === node.id ? "secondary" : "ghost"}
+              className={`w-full justify-start text-xs h-auto py-1.5 ${
+                selectedNodeId === node.id ? 'ring-2 ring-violet-500 bg-violet-500/10' : ''
+              }`}
               onClick={() => onNodeClick(node.id)}
             >
               <FileText className="mr-2 h-3 w-3 shrink-0" />

@@ -8,6 +8,7 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   linkedNotes?: string[];
+  ragMemoryId?: number; // ID of the corresponding memory in RAG
 }
 
 export interface NoteMetadata {

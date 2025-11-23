@@ -125,6 +125,7 @@ export default function GraphView({ onNewNode, newNodeToAdd }: GraphViewProps = 
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
+    setNewNodeId(null); // Clear new node highlight when clicking
     const note = notes.find((n) => n.id === nodeId);
     if (note) {
       setCurrentNote(note);
@@ -157,8 +158,6 @@ export default function GraphView({ onNewNode, newNodeToAdd }: GraphViewProps = 
         ...nodeData.node,
         color: getNodeColor(nodeData.node.type, nodeData.node.category, updatedColorMap),
         size: getNodeSize(nodeData.node.type),
-        x: dimensions.width / 2,
-        y: dimensions.height / 2,
       };
 
       const newEdges: D3Edge[] = nodeData.edges.map(edge => ({
@@ -193,35 +192,6 @@ export default function GraphView({ onNewNode, newNodeToAdd }: GraphViewProps = 
     }
   }, [addNewNode, onNewNode]);
 
-  useEffect(() => {
-    const windowWithGraph = window as unknown as { 
-      addGraphNode?: (nodeData: NewNodeData) => void;
-      pendingGraphNode?: NewNodeData;
-    };
-    
-    if (windowWithGraph.pendingGraphNode && graphData.nodes.length > 0) {
-      const pendingNode = windowWithGraph.pendingGraphNode;
-      
-      setTimeout(() => {
-        addNewNode(pendingNode);
-        delete windowWithGraph.pendingGraphNode;
-      }, 500);
-    }
-  }, [graphData.nodes.length, addNewNode]);
-
-  useEffect(() => {
-    if (newNodeToAdd && graphData.nodes.length > 0) {
-      const nodeExists = graphData.nodes.find(n => n.id === newNodeToAdd.node.id);
-      if (!nodeExists) {
-        setTimeout(() => {
-          addNewNode(newNodeToAdd);
-        }, 500);
-      } else {
-        setNewNodeId(newNodeToAdd.node.id);
-      }
-    }
-  }, [newNodeToAdd, graphData.nodes.length, graphData.nodes, addNewNode]);
-
   const { svgRef, containerRef, focusNode, zoomIn, zoomOut, resetZoom } = useGraphCanvas({
     graphData,
     isDarkMode,
@@ -234,10 +204,129 @@ export default function GraphView({ onNewNode, newNodeToAdd }: GraphViewProps = 
     selectedNodeId,
   });
 
+  useEffect(() => {
+    const windowWithGraph = window as unknown as { 
+      addGraphNode?: (nodeData: NewNodeData) => void;
+      pendingGraphNode?: NewNodeData;
+      focusPendingNode?: boolean;
+      onNodeAdded?: () => void;
+    };
+    
+    if (windowWithGraph.pendingGraphNode && graphData.nodes.length > 0) {
+      const pendingNode = windowWithGraph.pendingGraphNode;
+      const shouldFocus = windowWithGraph.focusPendingNode;
+      const onNodeAddedCallback = windowWithGraph.onNodeAdded;
+      
+      // Check if node already exists
+      const nodeExists = graphData.nodes.find(n => n.id === pendingNode.node.id);
+      
+      if (!nodeExists) {
+        addNewNode(pendingNode);
+        
+        // Focus and select the new node if requested
+        if (shouldFocus) {
+          console.log('Starting focus attempts for node:', pendingNode.node.id);
+          
+          // Set as selected and highlighted immediately
+          setSelectedNodeId(pendingNode.node.id);
+          setNewNodeId(pendingNode.node.id);
+          
+          // Function to attempt focus with retries
+          const attemptFocus = (attempts: number = 0, maxAttempts: number = 20) => {
+            if (attempts >= maxAttempts) {
+              console.warn('Failed to focus on new node after maximum attempts');
+              if (onNodeAddedCallback) {
+                onNodeAddedCallback();
+              }
+              return;
+            }
+            
+            setTimeout(() => {
+              console.log(`Focus attempt ${attempts + 1}/${maxAttempts}`);
+              
+              // Try to focus the node - it returns false if the node doesn't have position yet
+              const focusSuccess = focusNode(pendingNode.node.id);
+              
+              if (focusSuccess) {
+                console.log(`✓ Focus successful on attempt ${attempts + 1}`);
+                
+                // Clear the new node highlight after 2 seconds, keeping selected state
+                setTimeout(() => {
+                  setNewNodeId(null);
+                }, 2000);
+                
+                delete windowWithGraph.focusPendingNode;
+                delete windowWithGraph.pendingGraphNode;
+                
+                // Call the callback after node is focused
+                if (onNodeAddedCallback) {
+                  setTimeout(() => {
+                    onNodeAddedCallback();
+                  }, 500);
+                }
+              } else {
+                console.log(`✗ Attempt ${attempts + 1} failed: Node position not ready`);
+                // Retry with exponential backoff
+                attemptFocus(attempts + 1, maxAttempts);
+              }
+            }, 300 + (attempts * 300)); // Start with 300ms, increase by 300ms each attempt
+          };
+          
+          // Start attempting focus after initial delay to let simulation start
+          setTimeout(() => {
+            attemptFocus();
+          }, 1000);
+        } else if (onNodeAddedCallback) {
+          // No focus requested, just call callback
+          setTimeout(() => {
+            onNodeAddedCallback();
+          }, 300);
+        }
+        
+        // Don't delete here, let the focus callback do it
+      } else {
+        // Node already exists, just focus it
+        if (shouldFocus) {
+          setSelectedNodeId(pendingNode.node.id);
+          focusNode(pendingNode.node.id);
+        }
+        
+        // Call callback immediately since node already exists
+        if (onNodeAddedCallback) {
+          setTimeout(() => {
+            onNodeAddedCallback();
+          }, 1000);
+        }
+        
+        delete windowWithGraph.pendingGraphNode;
+        delete windowWithGraph.focusPendingNode;
+      }
+    }
+  }, [graphData.nodes.length, graphData.nodes, addNewNode, focusNode]);
+
+  useEffect(() => {
+    if (newNodeToAdd && graphData.nodes.length > 0) {
+      const nodeExists = graphData.nodes.find(n => n.id === newNodeToAdd.node.id);
+      if (!nodeExists) {
+        setTimeout(() => {
+          addNewNode(newNodeToAdd);
+          // Focus and select the newly added node
+          setTimeout(() => {
+            setSelectedNodeId(newNodeToAdd.node.id);
+            focusNode(newNodeToAdd.node.id);
+          }, 100);
+        }, 200);
+      } else {
+        setSelectedNodeId(newNodeToAdd.node.id);
+        focusNode(newNodeToAdd.node.id);
+      }
+    }
+  }, [newNodeToAdd, graphData.nodes.length, graphData.nodes, addNewNode, focusNode]);
+
   const handleFocusNode = (nodeId: string) => {
     setSelectedNodeId(nodeId);
     focusNode(nodeId);
-    setNewNodeId(nodeId);
+    setNewNodeId(null); // Clear previous new node highlight
   };
 
   if (isLoading) {
@@ -338,6 +427,7 @@ export default function GraphView({ onNewNode, newNodeToAdd }: GraphViewProps = 
         <GraphNodeList
           nodes={graphData.nodes}
           onNodeClick={handleFocusNode}
+          selectedNodeId={selectedNodeId}
         />
       </div>
     </div>

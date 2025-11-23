@@ -62,3 +62,4 @@ export function GraphLabelToggle({ mode, onModeChange }: GraphLabelToggleProps) 
   );
 }
 
+
