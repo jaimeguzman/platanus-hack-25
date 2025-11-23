@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'apis/speech_to_text_api/**'
+      - 'apis/speech_to_text_api/**/*.py'
+      - 'apis/speech_to_text_api/requirements.txt'
       - '.github/workflows/deploy-speech-to-text.yml'
 
 permissions:

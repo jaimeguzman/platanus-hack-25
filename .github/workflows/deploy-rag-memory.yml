@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'apis/rag_memory/**'
+      - 'apis/rag_memory/**/*.py'
+      - 'apis/rag_memory/requirements.txt'
       - '.github/workflows/deploy-rag-memory.yml'
 
 permissions:

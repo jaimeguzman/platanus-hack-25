@@ -1,0 +1,23 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        # Inject environment variables into .env.production for server-side access
+        - echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> .env.production
+        - echo "NEXT_PUBLIC_SPEECH_TO_TEXT_API_URL=$NEXT_PUBLIC_SPEECH_TO_TEXT_API_URL" >> .env.production
+        - echo "NEXT_PUBLIC_RAG_API_URL=$NEXT_PUBLIC_RAG_API_URL" >> .env.production
+        # Build the Next.js application
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
+      - node_modules/**/*

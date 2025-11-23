@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'apis/api-sst/**'
+      - 'apis/api-sst/**/*.py'
+      - 'apis/api-sst/requirements.txt'
       - '.github/workflows/deploy-api-sst.yml'
 
 permissions:
