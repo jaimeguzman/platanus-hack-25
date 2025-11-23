@@ -37,7 +37,7 @@ const features = [
 
 export function Features() {
   return (
-    <section className="py-20 bg-[#0A0A0A] relative">
+    <section id="features" className="py-20 bg-[#0A0A0A] relative">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0" style={{
@@ -103,20 +103,24 @@ export function Features() {
 
         {/* CTA */}
         <div className="text-center mt-16">
-          <button className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r 
+          <a 
+            href="https://demo-app.cognitive-context.online/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r 
                            from-blue-600 to-blue-700 text-white rounded-xl font-semibold 
                            hover:from-blue-700 hover:to-blue-800 transition-all duration-300 
-                           transform hover:scale-105 shadow-lg hover:shadow-blue-500/25">
+                           transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 cursor-pointer">
             <span>Explora todas las características</span>
             <Brain size={20} className="group-hover:rotate-12 transition-transform" />
-            <div className="absolute -top-2 -right-2 px-2 py-1 text-xs bg-orange-500 text-white rounded-full font-medium animate-pulse">
-              Beta
+            <div className="absolute -top-2 -right-2 px-2 py-1 text-xs bg-green-500 text-white rounded-full font-medium">
+              Demo
             </div>
-          </button>
+          </a>
           <div className="mt-3 text-sm text-[#666666]">
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Acceso anticipado limitado
+              Demo disponible ahora
             </span>
           </div>
         </div>

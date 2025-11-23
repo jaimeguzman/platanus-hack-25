@@ -135,7 +135,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isProcessingFile}
-          className="flex-shrink-0 w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-shrink-0 w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isProcessingFile ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -167,14 +167,14 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
         {text.trim() ? (
           <button
             onClick={handleSendText}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white transition-colors shadow-lg"
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white transition-colors shadow-lg cursor-pointer"
           >
             <Send className="w-5 h-5" />
           </button>
         ) : (
           <button
             onClick={handleStartRecording}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white transition-colors shadow-lg"
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white transition-colors shadow-lg cursor-pointer"
           >
             <Mic className="w-5 h-5" />
           </button>
@@ -183,4 +183,3 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
     </div>
   );
 }
-

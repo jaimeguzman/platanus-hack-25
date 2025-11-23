@@ -147,7 +147,7 @@ export function Footer() {
                          focus:border-blue-500 transition-colors"
               />
               <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white 
-                               rounded-lg font-medium transition-colors">
+                               rounded-lg font-medium transition-colors cursor-pointer">
                 Suscribirse
               </button>
             </div>
