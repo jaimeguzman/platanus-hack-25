@@ -8,6 +8,7 @@ applications:
         build:
           commands:
             - echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> .env.production
+            - echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> .env.production
             - echo "NEXT_PUBLIC_SPEECH_TO_TEXT_API_URL=$NEXT_PUBLIC_SPEECH_TO_TEXT_API_URL" >> .env.production
             - echo "NEXT_PUBLIC_RAG_API_URL=$NEXT_PUBLIC_RAG_API_URL" >> .env.production
             - npm run build
