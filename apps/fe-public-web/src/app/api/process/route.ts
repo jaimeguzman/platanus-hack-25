@@ -10,6 +10,9 @@ type ProcessRequest = {
 const RAG_API_URL =
   process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhost:8000';
 
+// Centralized timeout for RAG API calls: fixed 120s
+const RAG_API_TIMEOUT_MS = 120000;
+
 // Utility function for structured logging (Amplify CloudWatch friendly)
 function logError(context: string, error: unknown, metadata?: Record<string, unknown>) {
   const errorData = {
@@ -43,7 +46,7 @@ function logInfo(context: string, metadata?: Record<string, unknown>) {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = 10000
+  timeoutMs: number = RAG_API_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -383,7 +386,7 @@ function streamAnswerWithRag(input: {
     const res = await fetchWithTimeout(searchUrl, {
       method: 'GET',
       cache: 'no-store',
-    }, 10000);
+    }, RAG_API_TIMEOUT_MS);
 
     if (!res.ok) {
       const t = await res.text();
@@ -488,7 +491,7 @@ async function saveMemory(input: {
       auto_categorize: true, // Enable auto-categorization in RAG service
     }),
     cache: 'no-store',
-  }, 10000);
+  }, RAG_API_TIMEOUT_MS);
 
   if (!res.ok) {
     const t = await res.text();
@@ -527,7 +530,7 @@ async function answerWithRag(input: {
   const res = await fetchWithTimeout(searchUrl, {
     method: 'GET',
     cache: 'no-store',
-  }, 10000);
+  }, RAG_API_TIMEOUT_MS);
 
   if (!res.ok) {
     const t = await res.text();
