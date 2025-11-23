@@ -10,6 +10,60 @@ type ProcessRequest = {
 const RAG_API_URL =
   process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhost:8000';
 
+// Utility function for structured logging (Amplify CloudWatch friendly)
+function logError(context: string, error: unknown, metadata?: Record<string, unknown>) {
+  const errorData = {
+    timestamp: new Date().toISOString(),
+    context,
+    error: error instanceof Error ? {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    } : String(error),
+    metadata: {
+      ...metadata,
+      ragApiUrl: RAG_API_URL,
+      nodeEnv: process.env.NODE_ENV,
+    },
+  };
+  console.error(JSON.stringify(errorData));
+}
+
+function logInfo(context: string, metadata?: Record<string, unknown>) {
+  const logData = {
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    context,
+    metadata,
+  };
+  console.log(JSON.stringify(logData));
+}
+
+// Utility function for fetch with timeout
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 10000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms: ${url}`);
+    }
+    throw error;
+  }
+}
+
 function isToolUseBlock(
   block: unknown
 ): block is Anthropic.Messages.ToolUseBlock {
@@ -32,22 +86,41 @@ function isTextBlock(
 
 export async function POST(req: Request) {
   try {
+    logInfo('POST /api/process - Request received');
+
     const body = (await req.json()) as ProcessRequest;
     const text = (body.text || '').trim();
-    
+
     if (!text) {
+      logError('POST /api/process - Empty text', new Error('Text is empty'));
       return NextResponse.json(
         { error: 'Text cannot be empty' },
         { status: 400 },
       );
     }
 
+    // Validate required environment variables
     if (!process.env.ANTHROPIC_API_KEY) {
+      logError('POST /api/process - Missing ANTHROPIC_API_KEY', new Error('ANTHROPIC_API_KEY not configured'));
       return NextResponse.json(
         { error: 'ANTHROPIC_API_KEY is not configured on server' },
         { status: 500 },
       );
     }
+
+    if (!process.env.NEXT_PUBLIC_RAG_API_URL) {
+      logError('POST /api/process - Missing NEXT_PUBLIC_RAG_API_URL', new Error('NEXT_PUBLIC_RAG_API_URL not configured'), {
+        defaultValue: RAG_API_URL,
+        warning: 'Using default localhost - this will fail in production',
+      });
+    }
+
+    logInfo('POST /api/process - Environment validated', {
+      ragApiUrl: RAG_API_URL,
+      hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+      textLength: text.length,
+      source: body.source,
+    });
 
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
@@ -201,7 +274,9 @@ export async function POST(req: Request) {
     );
     
   } catch (err) {
-    console.error('process route error:', err);
+    logError('POST /api/process - Unhandled error', err, {
+      errorType: err instanceof Error ? err.constructor.name : typeof err,
+    });
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -244,7 +319,7 @@ function streamSmallTalk(input: { text: string; anthropic: Anthropic }) {
           }
           controller.close();
         } catch (error) {
-          console.error('Stream error (small_talk):', error);
+          logError('streamSmallTalk - Stream error', error);
           controller.error(error);
         }
       },
@@ -301,14 +376,22 @@ function streamAnswerWithRag(input: {
       limit: '5',
     });
     if (input.category) params.set('category', input.category);
-    
-    const res = await fetch(`${RAG_API_URL}/search?${params.toString()}`, {
+
+    const searchUrl = `${RAG_API_URL}/search?${params.toString()}`;
+    logInfo('streamAnswerWithRag - Fetching from RAG', { url: searchUrl });
+
+    const res = await fetchWithTimeout(searchUrl, {
       method: 'GET',
       cache: 'no-store',
-    });
-    
+    }, 10000);
+
     if (!res.ok) {
       const t = await res.text();
+      logError('streamAnswerWithRag - RAG search failed', new Error(`RAG /search error: ${res.status}`), {
+        url: searchUrl,
+        status: res.status,
+        responseText: t,
+      });
       throw new Error(`RAG /search error: ${res.status} - ${t}`);
     }
     
@@ -367,7 +450,7 @@ function streamAnswerWithRag(input: {
           }
           controller.close();
         } catch (error) {
-          console.error('Stream error:', error);
+          logError('streamAnswerWithRag - Stream error', error);
           controller.error(error);
         }
       },
@@ -392,7 +475,10 @@ async function saveMemory(input: {
   category?: string | null;
   source?: string;
 }) {
-  const res = await fetch(`${RAG_API_URL}/memories`, {
+  const saveUrl = `${RAG_API_URL}/memories`;
+  logInfo('saveMemory - Saving to RAG', { url: saveUrl, source: input.source });
+
+  const res = await fetchWithTimeout(saveUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -402,13 +488,18 @@ async function saveMemory(input: {
       auto_categorize: true, // Enable auto-categorization in RAG service
     }),
     cache: 'no-store',
-  });
-  
+  }, 10000);
+
   if (!res.ok) {
     const t = await res.text();
+    logError('saveMemory - RAG save failed', new Error(`RAG /memories error: ${res.status}`), {
+      url: saveUrl,
+      status: res.status,
+      responseText: t,
+    });
     throw new Error(`RAG /memories error: ${res.status} - ${t}`);
   }
-  
+
   return await res.json();
 }
 
@@ -429,14 +520,22 @@ async function answerWithRag(input: {
     limit: '5',
   });
   if (input.category) params.set('category', input.category);
-  
-  const res = await fetch(`${RAG_API_URL}/search?${params.toString()}`, {
+
+  const searchUrl = `${RAG_API_URL}/search?${params.toString()}`;
+  logInfo('answerWithRag - Fetching from RAG', { url: searchUrl });
+
+  const res = await fetchWithTimeout(searchUrl, {
     method: 'GET',
     cache: 'no-store',
-  });
-  
+  }, 10000);
+
   if (!res.ok) {
     const t = await res.text();
+    logError('answerWithRag - RAG search failed', new Error(`RAG /search error: ${res.status}`), {
+      url: searchUrl,
+      status: res.status,
+      responseText: t,
+    });
     throw new Error(`RAG /search error: ${res.status} - ${t}`);
   }
   
