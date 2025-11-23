@@ -1,3 +1,4 @@
+// @ts-expect-error: types may not be available in this env
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 
@@ -9,6 +10,26 @@ type ProcessRequest = {
 
 const RAG_API_URL =
   process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhost:8000';
+
+function isToolUseBlock(
+  block: unknown
+): block is Anthropic.Messages.ToolUseBlock {
+  return (
+    typeof block === 'object' &&
+    block !== null &&
+    (block as { type?: string }).type === 'tool_use'
+  );
+}
+
+function isTextBlock(
+  block: unknown
+): block is Anthropic.Messages.TextBlock {
+  return (
+    typeof block === 'object' &&
+    block !== null &&
+    (block as { type?: string }).type === 'text'
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -69,6 +90,22 @@ export async function POST(req: Request) {
           required: ['needs_citation'],
         },
       },
+      {
+        name: 'small_talk',
+        description:
+          'Use this when the user is engaging in casual conversation, greetings, or pleasantries. ' +
+          'Examples: "hola", "¿cómo estás?", "gracias", "buen día", emojis, risas, saludos.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            language: {
+              type: 'string',
+              enum: ['es'],
+              description: 'Language to answer in. Default: es (Spanish).',
+            },
+          },
+        },
+      },
     ];
 
     // Step 1: Use Claude function calling to determine intent
@@ -80,11 +117,13 @@ export async function POST(req: Request) {
         'Your job is to determine if the user wants to:',
         '1. SAVE information to their memory (save_memory)',
         '2. QUERY/ASK about information in their memory (answer_question)',
+        '3. Engage in casual conversation, greetings or pleasantries (small_talk)',
         '',
         'Decision criteria:',
         '- Use save_memory when user explicitly wants to store/remember/save information',
         '- Use answer_question when user asks questions or wants to retrieve information',
-        '- Default to answer_question for conversational queries',
+        '- Use small_talk for greetings/pleasantries (e.g., "hola", "¿cómo estás?", "gracias")',
+        '- Default to small_talk when the message is clearly social nicety and non-task',
         '',
         'You must choose exactly ONE tool.',
       ].join('\n'),
@@ -95,9 +134,7 @@ export async function POST(req: Request) {
     });
 
     // Step 2: Execute the chosen tool
-    const toolUse = intentResponse.content.find(
-      (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
-    );
+    const toolUse = (intentResponse.content as Array<unknown>).find(isToolUseBlock);
 
     if (!toolUse) {
       return NextResponse.json(
@@ -151,6 +188,20 @@ export async function POST(req: Request) {
       }
     }
 
+    // Execute small_talk
+    if (toolUse.name === 'small_talk') {
+      if (wantStream) {
+        return streamSmallTalk({ text, anthropic });
+      } else {
+        const answer = await smallTalk({ text, anthropic });
+        return NextResponse.json({
+          action: 'chatted',
+          intent: 'small_talk',
+          answer,
+        });
+      }
+    }
+
     // Fallback (should not reach here)
     return NextResponse.json(
       { error: 'Unknown tool selected' },
@@ -164,6 +215,82 @@ export async function POST(req: Request) {
   }
 }
 
+/**
+ * Stream small talk (no RAG)
+ */
+function streamSmallTalk(input: { text: string; anthropic: Anthropic }) {
+  return (async () => {
+    const stream = await input.anthropic.messages.stream({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 512,
+      system: [
+        'Eres un asistente conversacional en español, cercano y natural.',
+        'Responde saludos y small talk con 1-2 frases, de forma amable y directa.',
+        'No menciones memorias, herramientas ni contexto interno.',
+      ].join('\n'),
+      messages: [
+        {
+          role: 'user',
+          content: input.text,
+        },
+      ],
+      temperature: 0.6,
+    });
+
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            if (
+              chunk.type === 'content_block_delta' &&
+              chunk.delta.type === 'text_delta'
+            ) {
+              const text = chunk.delta.text;
+              controller.enqueue(encoder.encode(text));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          console.error('Stream error (small_talk):', error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      },
+    });
+  })();
+}
+
+/**
+ * Non-stream small talk (no RAG)
+ */
+async function smallTalk(input: { text: string; anthropic: Anthropic }) {
+  const response = await input.anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 512,
+    system: [
+      'Eres un asistente conversacional en español, cercano y natural.',
+      'Responde saludos y small talk con 1-2 frases, de forma amable y directa.',
+      'No menciones memorias, herramientas ni contexto interno.',
+    ].join('\n'),
+    messages: [
+      {
+        role: 'user',
+        content: input.text,
+      },
+    ],
+    temperature: 0.6,
+  });
+
+  const textContent = (response.content as Array<unknown>).find(isTextBlock);
+  return textContent?.text || '';
+}
 /**
  * Stream answer using RAG context
  * Step 1: Retrieve relevant memories from RAG
@@ -361,9 +488,7 @@ async function answerWithRag(input: {
   });
 
   // Extract text from response
-  const textContent = response.content.find(
-    (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
-  );
+  const textContent = (response.content as Array<unknown>).find(isTextBlock);
 
   return {
     results: search.map((r) => ({
