@@ -41,11 +41,13 @@ class MemoryCreate(BaseModel):
     text: str = Field(..., description="The text content of the memory")
     category: Optional[str] = Field(None, description="Optional category for the memory")
     source: Optional[str] = Field(None, description="Optional source identifier")
+    auto_categorize: bool = Field(True, description="Whether to auto-detect category if not provided")
 
 class MemoryBatchCreate(BaseModel):
     texts: List[str] = Field(..., description="List of text contents")
     categories: Optional[List[str]] = Field(None, description="Optional list of categories")
     sources: Optional[List[str]] = Field(None, description="Optional list of sources")
+    auto_categorize: bool = Field(True, description="Whether to auto-detect categories for texts without category")
 
 class MemoryUpdate(BaseModel):
     text: Optional[str] = Field(None, description="New text content")
@@ -281,6 +283,7 @@ async def create_memory(memory_data: MemoryCreate):
             text=memory_data.text,
             category=memory_data.category,
             source=memory_data.source,
+            auto_categorize=memory_data.auto_categorize,
         )
         
         # Build graph node data for the newly created memory
@@ -301,6 +304,7 @@ async def create_memories_batch(batch_data: MemoryBatchCreate):
             texts=batch_data.texts,
             categories=batch_data.categories,
             sources=batch_data.sources,
+            auto_categorize=batch_data.auto_categorize,
         )
         return [MemoryResponse.from_memory(memory) for memory in memories]
     except ValueError as e:
@@ -529,10 +533,12 @@ async def process_input(request: ProcessRequest):
             decider = "tool_calling"
 
         if intent == "save":
+            # Auto-categorize is enabled by default in the RAG service
             memory = rag_service.add_memory(
                 text=text,
                 category=request.category,
                 source=request.source,
+                auto_categorize=True,  # Enable auto-categorization
             )
             return {
                 "action": "saved",

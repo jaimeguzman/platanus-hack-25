@@ -13,6 +13,7 @@ from embeddings import EmbeddingGenerator
 from graph_store import MemoryGraphStore
 from chunking import TextChunker
 from config import config
+from category_detector import detect_category
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class RagMemoryService:
         text: str,
         category: Optional[str] = None,
         source: Optional[str] = None,
+        auto_categorize: bool = True,
     ) -> Memory:
         """
         Add a new memory to the system.
@@ -112,8 +114,9 @@ class RagMemoryService:
         
         Args:
             text: The full text content of the memory
-            category: Optional category/tag for the memory
+            category: Optional category/tag for the memory (auto-detected if not provided)
             source: Optional source identifier
+            auto_categorize: Whether to auto-detect category if not provided (default: True)
             
         Returns:
             The created Memory object
@@ -126,6 +129,17 @@ class RagMemoryService:
             raise ValueError("Memory text cannot be empty")
         
         text = text.strip()
+        
+        # Auto-detect category if not provided and auto_categorize is enabled
+        if auto_categorize and not category:
+            try:
+                detected_category = detect_category(text)
+                if detected_category:
+                    category = detected_category
+                    logger.info(f"Auto-detected category: {category}")
+            except Exception as e:
+                logger.warning(f"Category auto-detection failed: {e}")
+                # Continue without category
         
         # Split text into chunks
         chunk_texts = self.chunker.split_text(text)
@@ -248,6 +262,7 @@ class RagMemoryService:
         texts: List[str],
         categories: Optional[List[str]] = None,
         sources: Optional[List[str]] = None,
+        auto_categorize: bool = True,
     ) -> List[Memory]:
         """
         Add multiple memories efficiently in a batch.
@@ -257,6 +272,7 @@ class RagMemoryService:
             texts: List of full text contents
             categories: Optional list of categories (must match length of texts)
             sources: Optional list of sources (must match length of texts)
+            auto_categorize: Whether to auto-detect categories for texts without category
             
         Returns:
             List of created Memory objects
@@ -268,6 +284,24 @@ class RagMemoryService:
             raise ValueError("Categories list must match texts length")
         if sources and len(sources) != len(texts):
             raise ValueError("Sources list must match texts length")
+        
+        # Auto-detect categories for texts that don't have one
+        final_categories = []
+        if categories:
+            final_categories = list(categories)
+        else:
+            final_categories = [None] * len(texts)
+        
+        if auto_categorize:
+            for i, text in enumerate(texts):
+                if not final_categories[i]:
+                    try:
+                        detected_category = detect_category(text)
+                        if detected_category:
+                            final_categories[i] = detected_category
+                            logger.info(f"Auto-detected category for text {i}: {detected_category}")
+                    except Exception as e:
+                        logger.warning(f"Category auto-detection failed for text {i}: {e}")
         
         # Prepare all chunks for all texts
         all_chunks_data = []  # List of (text_idx, chunk_idx, chunk_text)
@@ -300,7 +334,7 @@ class RagMemoryService:
             for i, text in enumerate(texts):
                 memory = Memory(
                     text=text.strip(),
-                    category=categories[i] if categories else None,
+                    category=final_categories[i] if final_categories else None,
                     source=sources[i] if sources else None,
                 )
                 session.add(memory)
