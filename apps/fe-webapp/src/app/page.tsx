@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { NoteEditor } from '@/components/editor/NoteEditor';
 import GraphView from '@/components/graph/GraphView';
+import { ChatView } from '@/components/chat/ChatView';
 import { FloatingActionButton } from '@/components/ui/floating-action-button';
 import { VoiceNoteRecorder } from '@/components/voice-note/VoiceNoteRecorder';
 import { useNoteStore } from '@/stores/noteStore';
@@ -155,6 +156,8 @@ export default function Home() {
     switch (viewMode) {
       case 'dashboard':
         return <Dashboard />;
+      case 'chat':
+        return <ChatView />;
       case 'graph':
         return <GraphView />;
       case 'note':
@@ -192,7 +195,7 @@ export default function Home() {
           )}
         </main>
       </SidebarInset>
-      {!showVoiceRecorder && !isTranscribing && (
+      {!showVoiceRecorder && !isTranscribing && viewMode !== 'chat' && (
         <FloatingActionButton
           onNewNote={handleNewNote}
           onNewVoiceNote={handleNewVoiceNote}

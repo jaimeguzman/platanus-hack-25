@@ -13,6 +13,7 @@ import {
   Heart,
   Star,
   Brain,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -152,6 +153,16 @@ export function AppSidebar() {
                 >
                   <LayoutDashboard />
                   <span>Dashboard</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setViewMode('chat')}
+                  isActive={viewMode === 'chat'}
+                  tooltip="Chat"
+                >
+                  <MessageSquare />
+                  <span>Chat</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
