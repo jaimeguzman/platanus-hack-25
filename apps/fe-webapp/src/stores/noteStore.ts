@@ -10,7 +10,7 @@ interface NoteStore {
   // UI state
   searchQuery: string;
   selectedPillar: 'career' | 'social' | 'hobby' | 'all';
-  viewMode: 'dashboard' | 'graph' | 'note';
+  viewMode: 'dashboard' | 'graph' | 'note' | 'chat';
   showFavoritesOnly: boolean;
   
   // Editor state
@@ -31,7 +31,7 @@ interface NoteStore {
   // Actions - UI
   setSearchQuery: (query: string) => void;
   setSelectedPillar: (pillar: 'career' | 'social' | 'hobby' | 'all') => void;
-  setViewMode: (mode: 'dashboard' | 'graph' | 'note') => void;
+  setViewMode: (mode: 'dashboard' | 'graph' | 'note' | 'chat') => void;
   setShowFavoritesOnly: (show: boolean) => void;
   toggleNoteFavorite: (id: string) => void;
   
@@ -58,7 +58,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   currentNote: null,
   searchQuery: '',
   selectedPillar: 'all',
-  viewMode: 'dashboard',
+  viewMode: 'chat',
   showFavoritesOnly: false,
   editorTitle: '',
   editorContent: '',
