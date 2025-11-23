@@ -67,8 +67,8 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('audio/')) {
-      alert('Por favor selecciona un archivo de audio válido');
+    if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+      alert('Por favor selecciona un archivo de audio o video válido');
       return;
     }
 
