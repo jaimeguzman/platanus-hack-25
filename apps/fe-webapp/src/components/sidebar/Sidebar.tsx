@@ -1,19 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNoteStore } from '@/stores/noteStore';
+import { getAllCategories } from '@/services/ragService';
 import {
   LayoutDashboard,
   Network,
   FileText,
   Search,
-  Settings,
   Briefcase,
   Users,
   Heart,
-  Star,
   Brain,
   MessageSquare,
+  Activity,
+  Dumbbell,
+  GraduationCap,
+  DollarSign,
+  Home,
+  Utensils,
+  Smile,
+  Target,
+  Plane,
+  Gamepad2,
+  TrendingUp,
+  Laptop,
+  Palette,
+  Sparkles,
+  Calendar,
+  Moon,
+  PawPrint,
+  ShoppingCart,
+  Film,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -31,73 +49,116 @@ import {
 } from '@/components/ui/sidebar';
 import { APP_CONFIG, UI_MESSAGES } from '@/constants/config';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { getSupabaseClient } from '@/lib/supabase';
 
-const ICON_MAP: Record<string, typeof Briefcase> = {
-  'Desarrollo de Carrera': Briefcase,
-  'Social': Users,
-  'Hobby': Heart,
+// Category icon mapping based on RAG categories
+const CATEGORY_ICON_MAP: Record<string, typeof Activity> = {
+  'Salud': Activity,
+  'Ejercicio y Deporte': Dumbbell,
+  'Trabajo / Laboral': Briefcase,
+  'Estudios / Aprendizaje': GraduationCap,
+  'Finanzas': DollarSign,
+  'Relaciones Amorosas': Heart,
+  'Familia': Users,
+  'Amistades': Users,
+  'Vida Social': Users,
+  'Hogar y Organización': Home,
+  'Alimentación': Utensils,
+  'Estado de Ánimo / Emociones': Smile,
+  'Proyectos Personales': Target,
+  'Viajes': Plane,
+  'Hobbies': Gamepad2,
+  'Crecimiento Personal': TrendingUp,
+  'Tecnología / Gadgets': Laptop,
+  'Creatividad / Arte': Palette,
+  'Espiritualidad': Sparkles,
+  'Eventos Importantes': Calendar,
+  'Metas y Hábitos': Target,
+  'Sueño': Moon,
+  'Mascotas': PawPrint,
+  'Compras': ShoppingCart,
+  'Tiempo Libre / Entretenimiento': Film,
 };
 
-interface Pillar {
-  id: 'career' | 'social' | 'hobby';
+// Hardcoded categories from RAG
+const CATEGORIES = [
+  'Salud',
+  'Ejercicio y Deporte',
+  'Trabajo / Laboral',
+  'Estudios / Aprendizaje',
+  'Finanzas',
+  'Relaciones Amorosas',
+  'Familia',
+  'Amistades',
+  'Vida Social',
+  'Hogar y Organización',
+  'Alimentación',
+  'Estado de Ánimo / Emociones',
+  'Proyectos Personales',
+  'Viajes',
+  'Hobbies',
+  'Crecimiento Personal',
+  'Tecnología / Gadgets',
+  'Creatividad / Arte',
+  'Espiritualidad',
+  'Eventos Importantes',
+  'Metas y Hábitos',
+  'Sueño',
+  'Mascotas',
+  'Compras',
+  'Tiempo Libre / Entretenimiento',
+];
+
+interface Category {
+  id: string;
   label: string;
-  icon: typeof Briefcase;
+  icon: typeof Activity;
+  count?: number;
 }
-
-const PILLAR_NAME_TO_ID: Record<string, 'career' | 'social' | 'hobby'> = {
-  'Desarrollo de Carrera': 'career',
-  'Social': 'social',
-  'Hobby': 'hobby',
-};
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const {
     viewMode,
     setViewMode,
-    selectedPillar,
-    setSelectedPillar,
+    selectedCategory,
+    setSelectedCategory,
     searchQuery,
     setSearchQuery,
     setCurrentNote,
-    showFavoritesOnly,
-    setShowFavoritesOnly,
-    getFavoriteNotes,
     getFilteredNotes,
   } = useNoteStore();
   
-  const [pillars, setPillars] = useState<Pillar[]>([
-    { id: 'career', label: 'Desarrollo de Carrera', icon: Briefcase },
-    { id: 'social', label: 'Social', icon: Users },
-    { id: 'hobby', label: 'Hobby', icon: Heart },
-  ]);
+  const [categories, setCategories] = useState<Category[]>(
+    CATEGORIES.map((cat) => ({
+      id: cat,
+      label: cat,
+      icon: CATEGORY_ICON_MAP[cat] || FileText,
+      count: 0,
+    }))
+  );
 
+  // Load category counts from RAG API
   useEffect(() => {
-    const loadPillars = async () => {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase
-        .from('projects')
-        .select('name')
-        .in('name', ['Desarrollo de Carrera', 'Social', 'Hobby'])
-        .order('name');
-      
-      if (data) {
-        const loadedPillars: Pillar[] = (data as Array<{ name: string }>)
-          .map((p) => {
-            const id = PILLAR_NAME_TO_ID[p.name];
-            const icon = ICON_MAP[p.name] || Briefcase;
-            return id ? { id, label: p.name, icon } : null;
-          })
-          .filter((p): p is Pillar => p !== null);
+    const loadCategoryCounts = async () => {
+      try {
+        const { category_counts } = await getAllCategories();
         
-        if (loadedPillars.length > 0) {
-          setPillars(loadedPillars);
-        }
+        // Update categories with counts
+        setCategories(prev => 
+          prev.map(cat => {
+            const countData = category_counts.find(c => c.category === cat.id);
+            return {
+              ...cat,
+              count: countData?.count || 0,
+            };
+          })
+        );
+      } catch (error) {
+        console.error('Error loading category counts:', error);
       }
     };
-    
-    loadPillars();
+
+    loadCategoryCounts();
   }, []);
 
   const filteredNotes = getFilteredNotes();
@@ -105,6 +166,18 @@ export function AppSidebar() {
   const recentNotes = filteredNotes
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, APP_CONFIG.RECENT_NOTES_LIMIT);
+
+  // Get notes for selected category
+  const categoryNotes = selectedCategory && selectedCategory !== 'all'
+    ? filteredNotes
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    : [];
+
+  // Show category notes when a category is selected, otherwise show recent notes
+  const displayNotes = selectedCategory && selectedCategory !== 'all' ? categoryNotes : recentNotes;
+  const notesLabel = selectedCategory && selectedCategory !== 'all' 
+    ? `${selectedCategory} (${categoryNotes.length})`
+    : 'Recientes';
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -175,58 +248,45 @@ export function AppSidebar() {
                   <span>Graph View</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => setViewMode('note')}
-                  isActive={viewMode === 'note'}
-                  tooltip="Notas"
-                >
-                  <FileText />
-                  <span>Notas</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  isActive={false}
-                  tooltip={`Favoritos (${getFavoriteNotes().length})`}
-                  className="data-[active=true]:bg-transparent data-[active=true]:font-normal data-[active=true]:text-sidebar-foreground"
-                >
-                  <Star />
-                  <span>Favoritos</span>
-                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-sidebar-primary text-xs text-sidebar-primary-foreground">
-                    {getFavoriteNotes().length}
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Pillars */}
+        {/* Categories */}
         <SidebarGroup>
-          <SidebarGroupLabel>Areas</SidebarGroupLabel>
+          <SidebarGroupLabel>Áreas</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {pillars.map((pillar) => {
-                const Icon = pillar.icon;
-                const isActive = selectedPillar === pillar.id;
+              {categories.map((category) => {
+                const Icon = category.icon;
+                const isActive = selectedCategory === category.id;
+                const hasNotes = (category.count || 0) > 0;
+                
+                // Only show categories with notes
+                if (!hasNotes && !isActive) return null;
+                
                 return (
-                  <SidebarMenuItem key={pillar.id}>
+                  <SidebarMenuItem key={category.id}>
                     <SidebarMenuButton
                       onClick={() => {
-                        // Toggle: si ya está seleccionado, deseleccionar (mostrar todas)
+                        // Toggle: if already selected, deselect (show all)
                         if (isActive) {
-                          setSelectedPillar('all');
+                          setSelectedCategory('all');
                         } else {
-                          setSelectedPillar(pillar.id);
+                          setSelectedCategory(category.id);
+                          // Don't change view mode, just update the notes list
                         }
                       }}
                       isActive={isActive}
-                      tooltip={pillar.label}
+                      tooltip={category.label}
                     >
                       <Icon />
-                      <span>{pillar.label}</span>
+                      <span>{category.label}</span>
+                      {hasNotes && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-sidebar-accent text-xs">
+                          {category.count}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -235,19 +295,22 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Recent Notes */}
+        {/* Notes List (Category or Recent) */}
         <SidebarGroup>
-          <SidebarGroupLabel>Recientes</SidebarGroupLabel>
+          <SidebarGroupLabel>{notesLabel}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {recentNotes.length === 0 ? (
+              {displayNotes.length === 0 ? (
                 <SidebarMenuItem>
                   <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                    {UI_MESSAGES.NO_RECENT_NOTES}
+                    {selectedCategory && selectedCategory !== 'all' 
+                      ? 'No hay notas en esta categoría'
+                      : UI_MESSAGES.NO_RECENT_NOTES
+                    }
                   </div>
                 </SidebarMenuItem>
               ) : (
-                recentNotes.map((note) => (
+                displayNotes.map((note) => (
                   <SidebarMenuItem key={note.id}>
                     <SidebarMenuButton
                       onClick={() => {
@@ -271,12 +334,6 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <ThemeToggle />
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Configuración">
-              <Settings />
-              <span>Configuración</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

@@ -24,6 +24,10 @@ class RagConfig:
     embedding_model: str = "text-embedding-3-small"
     embedding_dimension: int = 1536
     
+    # Anthropic settings
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    category_detection_model: str = "claude-3-5-haiku-20241022"
+    
     # Memory graph settings
     similarity_threshold: float = 0.7  # Minimum similarity to create edge (0.0 to 1.0)
     max_similar_connections: int = 5  # Max connections per memory
@@ -52,6 +56,9 @@ class RagConfig:
         """Validate configuration settings."""
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY must be set")
+        
+        if not self.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY must be set")
         
         if not 0.0 <= self.similarity_threshold <= 1.0:
             raise ValueError("similarity_threshold must be between 0.0 and 1.0")

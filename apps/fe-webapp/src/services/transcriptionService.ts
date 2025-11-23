@@ -67,11 +67,11 @@ async function blobToBase64(blob: Blob): Promise<string> {
 
 /**
  * Transcribe audio from a Blob and store in RAG memory
+ * Category will be auto-detected by the RAG service
  */
 export async function transcribeAudioDirect(
   audioBlob: Blob,
   filename?: string,
-  category?: string,
   source?: string
 ): Promise<TranscriptionResponse> {
   try {
@@ -93,8 +93,8 @@ export async function transcribeAudioDirect(
       body: JSON.stringify({
         audio_base64: audioBase64,
         filename: filename || 'recording.wav',
-        category: category,
         source: source,
+        // No category parameter - will be auto-detected by RAG service
       }),
     });
 

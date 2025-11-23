@@ -1,5 +1,6 @@
 # Core dependencies
 openai==2.8.1
+anthropic==0.74.0
 psycopg2-binary==2.9.11
 SQLAlchemy==2.0.44
 pgvector==0.4.1

@@ -10,33 +10,6 @@ type ProcessRequest = {
 const RAG_API_URL =
   process.env.NEXT_PUBLIC_RAG_API_URL || 'http://localhost:8000';
 
-  const CATEGORIES =[
-  "Salud",
-  "Ejercicio y Deporte",
-  "Trabajo / Laboral",
-  "Estudios / Aprendizaje",
-  "Finanzas",
-  "Relaciones Amorosas",
-  "Familia",
-  "Amistades",
-  "Vida Social",
-  "Hogar y Organización",
-  "Alimentación",
-  "Estado de Ánimo / Emociones",
-  "Proyectos Personales",
-  "Viajes",
-  "Hobbies",
-  "Crecimiento Personal",
-  "Tecnología / Gadgets",
-  "Creatividad / Arte",
-  "Espiritualidad",
-  "Eventos Importantes",
-  "Metas y Hábitos",
-  "Sueño",
-  "Mascotas",
-  "Compras",
-  "Tiempo Libre / Entretenimiento"
-] as const;
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ProcessRequest;
@@ -75,19 +48,8 @@ export async function POST(req: Request) {
           'Examples: "Remember that...", "Save this note...", "I learned today that..."',
         input_schema: {
           type: 'object',
-          properties: {
-            category: {
-              type: 'string',
-              enum: CATEGORIES,
-              description: 'The category this memory belongs to. Must be one of the predefined categories.',
-            },
-            source: {
-              type: 'string',
-              enum: ['chat', 'voice_note', 'conversation'],
-              description: 'The source of this memory. Must be one of the predefined sources.',
-            },
-          },
-          required: ['category', 'source'],
+          properties: {},
+          required: [],
         },
       },
       {
@@ -124,7 +86,7 @@ export async function POST(req: Request) {
         '- Use answer_question when user asks questions or wants to retrieve information',
         '- Default to answer_question for conversational queries',
         '',
-        'You must choose exactly ONE tool. Provide appropriate arguments for the chosen tool.',
+        'You must choose exactly ONE tool.',
       ].join('\n'),
       messages: [{ role: 'user', content: text }],
       tools,
@@ -146,11 +108,10 @@ export async function POST(req: Request) {
 
     // Execute save_memory
     if (toolUse.name === 'save_memory') {
-      const args = toolUse.input as { category: string; source: string };
       const memory = await saveMemory({
         text,
-        category: args?.category || body.category || 'general',
-        source: args?.source || body.source || 'web_chat',
+        category: body.category || null,
+        source: body.source || 'web_chat',
       });
       
       return NextResponse.json({
@@ -305,10 +266,11 @@ function streamAnswerWithRag(input: {
 
 /**
  * Save memory to RAG system
+ * Category will be auto-detected by the RAG service
  */
 async function saveMemory(input: {
   text: string;
-  category?: string;
+  category?: string | null;
   source?: string;
 }) {
   const res = await fetch(`${RAG_API_URL}/memories`, {
@@ -318,6 +280,7 @@ async function saveMemory(input: {
       text: input.text,
       category: input.category,
       source: input.source,
+      auto_categorize: true, // Enable auto-categorization in RAG service
     }),
     cache: 'no-store',
   });

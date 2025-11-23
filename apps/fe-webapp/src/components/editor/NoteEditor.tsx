@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as React from 'react';
 import { useNoteStore } from '@/stores/noteStore';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from 'next-themes';
 import type { Components } from 'react-markdown';
-import { APP_CONFIG, UI_MESSAGES, DEFAULT_VALUES, FORMATTING } from '@/constants';
+import { UI_MESSAGES, DEFAULT_VALUES, FORMATTING } from '@/constants';
 import { useToast } from '@/hooks/use-toast';
 import { createNote as createNoteService } from '@/services/noteService';
 

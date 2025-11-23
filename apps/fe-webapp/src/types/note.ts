@@ -3,7 +3,7 @@ export interface Note {
   title: string;
   content: string;
   tags: string[];
-  pillar: 'career' | 'social' | 'hobby';
+  pillar: string;
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -15,7 +15,7 @@ export interface NoteMetadata {
   id: string;
   title: string;
   tags: string[];
-  pillar: 'career' | 'social' | 'hobby';
+  pillar: string;
   updatedAt: string;
 }
 

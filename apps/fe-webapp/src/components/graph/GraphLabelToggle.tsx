@@ -18,19 +18,6 @@ interface GraphLabelToggleProps {
 }
 
 export function GraphLabelToggle({ mode, onModeChange }: GraphLabelToggleProps) {
-  const getModeLabel = (m: LabelMode) => {
-    switch (m) {
-      case 'all':
-        return 'Todas las etiquetas';
-      case 'selected':
-        return 'Solo seleccionado';
-      case 'adjacent':
-        return 'Nodos adyacentes';
-      case 'none':
-        return 'Sin etiquetas';
-    }
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

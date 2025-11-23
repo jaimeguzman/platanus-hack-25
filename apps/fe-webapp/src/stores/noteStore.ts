@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Note } from '@/types/note';
-import { updateNote as updateNoteService, createNote as createNoteService } from '@/services/noteService';
+import { updateNote as updateNoteService } from '@/services/noteService';
 
 interface NoteStore {
   // Notes state
@@ -9,7 +9,7 @@ interface NoteStore {
   
   // UI state
   searchQuery: string;
-  selectedPillar: 'career' | 'social' | 'hobby' | 'all';
+  selectedCategory: string | 'all';
   viewMode: 'dashboard' | 'graph' | 'note' | 'chat';
   showFavoritesOnly: boolean;
   
@@ -30,7 +30,7 @@ interface NoteStore {
   
   // Actions - UI
   setSearchQuery: (query: string) => void;
-  setSelectedPillar: (pillar: 'career' | 'social' | 'hobby' | 'all') => void;
+  setSelectedCategory: (category: string | 'all') => void;
   setViewMode: (mode: 'dashboard' | 'graph' | 'note' | 'chat') => void;
   setShowFavoritesOnly: (show: boolean) => void;
   toggleNoteFavorite: (id: string) => void;
@@ -57,8 +57,8 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   notes: [],
   currentNote: null,
   searchQuery: '',
-  selectedPillar: 'all',
-  viewMode: 'chat',
+  selectedCategory: 'all',
+  viewMode: 'dashboard',
   showFavoritesOnly: false,
   editorTitle: '',
   editorContent: '',
@@ -88,8 +88,6 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
   
   updateNote: async (id, updates) => {
-    const state = get();
-    
     try {
       // Call the service to update in RAG
       const updatedNote = await updateNoteService(id, updates);
@@ -124,7 +122,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   // UI actions
   setSearchQuery: (query) => set({ searchQuery: query }),
-  setSelectedPillar: (pillar) => set({ selectedPillar: pillar }),
+  setSelectedCategory: (category) => set({ selectedCategory: category }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setShowFavoritesOnly: (show) => set({ showFavoritesOnly: show }),
   
@@ -199,14 +197,14 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   // Computed
   getFilteredNotes: () => {
-    const { notes, selectedPillar, showFavoritesOnly } = get();
-    // Las notas ya vienen filtradas por búsqueda desde Supabase si hay searchQuery
-    // Solo aplicamos filtros adicionales de pilar y favoritos
+    const { notes, selectedCategory, showFavoritesOnly } = get();
+    // Notes already filtered by search from Supabase if there is searchQuery
+    // Only apply additional filters for category and favorites
     return notes.filter((note) => {
-      const matchesPillar =
-        selectedPillar === 'all' || note.pillar === selectedPillar;
+      const matchesCategory =
+        selectedCategory === 'all' || note.pillar === selectedCategory;
       const matchesFavorites = !showFavoritesOnly || note.isFavorite;
-      return matchesPillar && matchesFavorites;
+      return matchesCategory && matchesFavorites;
     });
   },
   
